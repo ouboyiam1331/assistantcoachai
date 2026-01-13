@@ -148,7 +148,7 @@ export const FBS_TEAMS: FbsTeam[] = [
   { name: "Vanderbilt", slug: "vanderbilt", conference: "SEC" },
 
   // Sun Belt
-  { name: "Appalachian State", slug: "appalachian-state", conference: "Sun Belt" },
+  { name: "App State", slug: "app-state", conference: "Sun Belt" },
   { name: "Arkansas State", slug: "arkansas-state", conference: "Sun Belt" },
   { name: "Coastal Carolina", slug: "coastal-carolina", conference: "Sun Belt" },
   { name: "Georgia Southern", slug: "georgia-southern", conference: "Sun Belt" },
