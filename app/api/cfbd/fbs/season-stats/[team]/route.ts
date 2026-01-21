@@ -1,160 +1,255 @@
+// app/api/cfbd/fbs/season-stats/[team]/route.ts
 import { NextResponse } from "next/server";
-import { getTeamMeta } from "@/data/teamMeta";
-import { FBS_TEAMS } from "@/data/fbsTeams";
 
-function toTeamNameFromSlug(slug: string) {
-  // 1) try FBS list (your canonical names)
-  const fromList = FBS_TEAMS.find((t: any) => t.slug === slug)?.name;
-  if (fromList) return fromList;
-
-  // 2) try teamMeta name
-  const meta = getTeamMeta(slug);
-  if (meta?.name) return meta.name;
-
-  // 3) fallback: slug -> title case
-  return slug
-    .split("-")
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
-    .join(" ");
+function normalizeTeamName(s: string) {
+  return s
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, "")
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]/g, "")
+    .trim();
 }
 
-function pickNumber(obj: any, keys: string[]) {
-  for (const k of keys) {
-    const v = obj?.[k];
-    if (typeof v === "number" && Number.isFinite(v)) return v;
+function isSameTeam(a?: string | null, b?: string | null) {
+  if (!a || !b) return false;
+  const na = normalizeTeamName(a);
+  const nb = normalizeTeamName(b);
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
+function toNum(v: any): number | null {
+  if (v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseMadeAttempt(val: any): { made: number; att: number } | null {
+  if (val === null || val === undefined) return null;
+  const s = String(val).trim();
+  // common formats: "5-12", "5/12"
+  const m = s.match(/^(\d+)\s*[-/]\s*(\d+)$/);
+  if (!m) return null;
+  const made = Number(m[1]);
+  const att = Number(m[2]);
+  if (!Number.isFinite(made) || !Number.isFinite(att) || att <= 0) return null;
+  return { made, att };
+}
+
+function pickTeamFromTeams(teams: any[], teamParam: string) {
+  const found = teams.find((t) => isSameTeam(t?.school, teamParam));
+  if (found) return found;
+
+  // fallback: some responses might use "team" instead of "school"
+  const found2 = teams.find((t) => isSameTeam(t?.team, teamParam));
+  return found2 ?? null;
+}
+
+function getStatValue(teamObj: any, wanted: string): any {
+  // CFBD /games/teams commonly returns team.stats = [{ category, stat, value }]
+  const stats: any[] = Array.isArray(teamObj?.stats) ? teamObj.stats : [];
+  const match = stats.find((s) => String(s?.stat).toLowerCase() === wanted.toLowerCase());
+  return match?.value ?? null;
+}
+
+function getFirstMatchingStat(teamObj: any, wantedList: string[]): any {
+  for (const w of wantedList) {
+    const v = getStatValue(teamObj, w);
+    if (v !== null && v !== undefined && String(v).trim() !== "") return v;
   }
   return null;
 }
 
-/**
- * CFBD season stats response formats vary by endpoint/version.
- * This normalizer tries multiple likely field names.
- */
-function normalizeSeasonStats(raw: any) {
-  // CFBD sometimes returns an object, sometimes an array (use first row)
-  const row = Array.isArray(raw) ? raw[0] : raw;
-
-  // Common “season team stats” shapes seen in the wild
-  const games = pickNumber(row, ["games", "g", "totalGames"]);
-  const pointsForPerGame = pickNumber(row, ["pointsPerGame", "ppg", "points_per_game"]);
-  const pointsAgainstPerGame = pickNumber(row, ["oppPointsPerGame", "opponentPointsPerGame", "papg", "opp_ppg"]);
-
-  const totalYardsPerGame = pickNumber(row, ["totalYardsPerGame", "yardsPerGame", "ypg"]);
-  const passYardsPerGame = pickNumber(row, ["passYardsPerGame", "passingYardsPerGame", "pass_ypg"]);
-  const rushYardsPerGame = pickNumber(row, ["rushYardsPerGame", "rushingYardsPerGame", "rush_ypg"]);
-
-  const thirdDownPct = pickNumber(row, ["thirdDownPct", "thirdDownConvPct", "third_down_pct"]);
-  const redZonePct = pickNumber(row, ["redZonePct", "redZoneConvPct", "red_zone_pct"]);
-
-  const penaltyYardsPerGame = pickNumber(row, [
-    "penaltyYardsPerGame",
-    "penaltyYardsPg",
-    "penalty_ypg",
-    "penYardsPerGame",
-  ]);
-
-  const turnoversLost = pickNumber(row, ["turnoversLost", "turnovers", "turnovers_lost"]);
-
-  return {
-    games,
-    pointsForPerGame,
-    pointsAgainstPerGame,
-    totalYardsPerGame,
-    passYardsPerGame,
-    rushYardsPerGame,
-    thirdDownPct,
-    redZonePct,
-    penaltyYardsPerGame,
-    turnoversLost,
-  };
-}
-
 export async function GET(
   req: Request,
-  context: { params: Promise<{ team: string }> }
+  ctx: { params: Promise<{ team: string }> }
 ) {
-  const { team } = await context.params;
-  const url = new URL(req.url);
+  try {
+    const { team } = await ctx.params;
+    if (!team) {
+      return NextResponse.json({ ok: false, error: "Missing team param" }, { status: 400 });
+    }
 
-  const yearParam = url.searchParams.get("year");
-  const year = yearParam ? Number(yearParam) : 2025;
+    const url = new URL(req.url);
+    const year = Number(url.searchParams.get("year") || "2025");
+    const seasonType = url.searchParams.get("seasonType") || "both"; // regular | postseason | both
 
-  const apiKey = process.env.CFBD_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { ok: false, error: "Missing CFBD_API_KEY env var" },
-      { status: 500 }
-    );
-  }
+    const apiKey = process.env.CFBD_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ ok: false, error: "Missing CFBD_API_KEY" }, { status: 500 });
+    }
 
-  const teamName = toTeamNameFromSlug(team);
+    const endpoint =
+      `https://api.collegefootballdata.com/games/teams?year=${encodeURIComponent(String(year))}` +
+      `&team=${encodeURIComponent(team)}` +
+      `&seasonType=${encodeURIComponent(seasonType)}`;
 
-  async function fetchYear(y: number) {
-    // CFBD “season stats” endpoint (team + year)
-    // If your CFBD plan/endpoint differs, this is the ONLY line you’d change.
-    const endpoint = `https://api.collegefootballdata.com/stats/season?year=${encodeURIComponent(
-      String(y)
-    )}&team=${encodeURIComponent(teamName)}`;
-
-    const res = await fetch(endpoint, {
+    const r = await fetch(endpoint, {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         Accept: "application/json",
       },
-      // avoid caching during dev
       cache: "no-store",
     });
 
-    const text = await res.text();
-    let data: any = null;
-    try {
-      data = text ? JSON.parse(text) : null;
-    } catch {
-      data = null;
+    const data = await r.json();
+
+    if (!r.ok) {
+      return NextResponse.json(
+        { ok: false, error: data?.message || data?.error || `CFBD error (${r.status})` },
+        { status: 502 }
+      );
     }
 
-    return { res, data, endpoint };
-  }
+    const gamesArr: any[] = Array.isArray(data) ? data : [];
+    // Each game element usually looks like: { id, season, week, teams: [{school, points, stats: [...]}, ...] }
+    // We only use games with points present (final or at least scored)
+    let gamesPlayed = 0;
 
-  // Try requested year, then fallback to previous year if empty
-  const first = await fetchYear(year);
+    let pointsFor = 0;
+    let pointsAgainst = 0;
 
-  const firstArray = Array.isArray(first.data) ? first.data : [];
-  const firstHasRows = first.res.ok && firstArray.length > 0;
+    let totalYardsFor = 0;
+    let passYardsFor = 0;
+    let rushYardsFor = 0;
 
-  if (firstHasRows) {
+    let totalYardsAgainst = 0;
+
+    let thirdMade = 0;
+    let thirdAtt = 0;
+
+    let rzMade = 0;
+    let rzAtt = 0;
+
+    let penalties = 0;
+    let penaltyYards = 0;
+
+    let turnovers = 0;
+    let oppTurnovers = 0;
+
+    for (const g of gamesArr) {
+      const teams = Array.isArray(g?.teams) ? g.teams : [];
+      if (teams.length < 2) continue;
+
+      const me = pickTeamFromTeams(teams, team);
+      if (!me) continue;
+
+      const opp = teams.find((t) => t !== me) ?? null;
+      if (!opp) continue;
+
+      const myPts = toNum(me?.points);
+      const oppPts = toNum(opp?.points);
+
+      // if no score yet, skip (not final / no stats worth averaging)
+      if (myPts === null || oppPts === null) continue;
+
+      gamesPlayed += 1;
+      pointsFor += myPts;
+      pointsAgainst += oppPts;
+
+      // Yards (try several common stat labels)
+      const myTotalYards = toNum(getFirstMatchingStat(me, ["totalYards", "total yards"])) ?? 0;
+      const myPassYards = toNum(getFirstMatchingStat(me, ["netPassingYards", "net passing yards", "passingYards"])) ?? 0;
+      const myRushYards = toNum(getFirstMatchingStat(me, ["rushingYards", "rushing yards"])) ?? 0;
+
+      const oppTotalYards = toNum(getFirstMatchingStat(opp, ["totalYards", "total yards"])) ?? 0;
+
+      totalYardsFor += myTotalYards;
+      passYardsFor += myPassYards;
+      rushYardsFor += myRushYards;
+
+      totalYardsAgainst += oppTotalYards;
+
+      // 3rd down efficiency often "thirdDownEff" or "3rdDownEff" or "thirdDownConversions"
+      const thirdVal =
+        getFirstMatchingStat(me, ["thirdDownEff", "3rdDownEff", "third down efficiency"]) ??
+        getFirstMatchingStat(me, ["thirdDownConversions"]); // sometimes a number only (less useful)
+
+      const thirdParsed = parseMadeAttempt(thirdVal);
+      if (thirdParsed) {
+        thirdMade += thirdParsed.made;
+        thirdAtt += thirdParsed.att;
+      }
+
+      // Red zone efficiency often "redZoneEff" or "red zone efficiency"
+      const rzVal =
+        getFirstMatchingStat(me, ["redZoneEff", "red zone efficiency"]) ??
+        getFirstMatchingStat(me, ["redZoneConversions"]);
+
+      const rzParsed = parseMadeAttempt(rzVal);
+      if (rzParsed) {
+        rzMade += rzParsed.made;
+        rzAtt += rzParsed.att;
+      }
+
+      // Penalties often "penalties" as "8-60" or separate "penalties" and "penaltyYards"
+      const penVal = getFirstMatchingStat(me, ["penalties", "penalty", "penalties-yards"]);
+      const penParsed = parseMadeAttempt(penVal); // works for "8-60"
+      if (penParsed) {
+        penalties += penParsed.made;
+        penaltyYards += penParsed.att;
+      } else {
+        const penCount = toNum(penVal);
+        if (penCount !== null) penalties += penCount;
+        const penYds = toNum(getFirstMatchingStat(me, ["penaltyYards", "penalty yards"]));
+        if (penYds !== null) penaltyYards += penYds;
+      }
+
+      // Turnovers often "turnovers"
+      const toVal = toNum(getFirstMatchingStat(me, ["turnovers"])) ?? 0;
+      const oppToVal = toNum(getFirstMatchingStat(opp, ["turnovers"])) ?? 0;
+      turnovers += toVal;
+      oppTurnovers += oppToVal;
+    }
+
+    // If no games found in this year, we still return ok:true but stats will be null-ish
+    const ppg = gamesPlayed ? pointsFor / gamesPlayed : null;
+    const papg = gamesPlayed ? pointsAgainst / gamesPlayed : null;
+
+    const ypg = gamesPlayed ? totalYardsFor / gamesPlayed : null;
+    const passYpg = gamesPlayed ? passYardsFor / gamesPlayed : null;
+    const rushYpg = gamesPlayed ? rushYardsFor / gamesPlayed : null;
+
+    const ypgAllowed = gamesPlayed ? totalYardsAgainst / gamesPlayed : null;
+
+    const thirdPct = thirdAtt ? (thirdMade / thirdAtt) * 100 : null;
+    const rzPct = rzAtt ? (rzMade / rzAtt) * 100 : null;
+
+    const penPg = gamesPlayed ? penalties / gamesPlayed : null;
+    const penYdsPg = gamesPlayed ? penaltyYards / gamesPlayed : null;
+
+    const toMarginPg = gamesPlayed ? (oppTurnovers - turnovers) / gamesPlayed : null;
+
     return NextResponse.json({
       ok: true,
-      yearUsed: year,
-      team: teamName,
-      stats: normalizeSeasonStats(first.data),
+      team,
+      year,
+      seasonType,
+      stats: {
+        games: gamesPlayed,
+
+        pointsPerGame: ppg,
+        pointsAllowedPerGame: papg,
+
+        yardsPerGame: ypg,
+        passYardsPerGame: passYpg,
+        rushYardsPerGame: rushYpg,
+
+        yardsAllowedPerGame: ypgAllowed,
+
+        thirdDownPct: thirdPct,
+        redZonePct: rzPct,
+
+        penaltiesPerGame: penPg,
+        penaltyYardsPerGame: penYdsPg,
+
+        turnoverMarginPerGame: toMarginPg,
+      },
     });
+  } catch (e: any) {
+    return NextResponse.json(
+      { ok: false, error: e?.message || "Unknown error" },
+      { status: 500 }
+    );
   }
-
-  const fallbackYear = year - 1;
-  const second = await fetchYear(fallbackYear);
-
-  const secondArray = Array.isArray(second.data) ? second.data : [];
-  const secondHasRows = second.res.ok && secondArray.length > 0;
-
-  if (secondHasRows) {
-    return NextResponse.json({
-      ok: true,
-      yearUsed: fallbackYear,
-      team: teamName,
-      stats: normalizeSeasonStats(second.data),
-    });
-  }
-
-  // If both fail, return debug info (helps you diagnose key/endpoint issues)
-  return NextResponse.json(
-    {
-      ok: false,
-      error: "No season stats returned for requested year or fallback year.",
-      requestedYear: year,
-      fallbackYear,
-      team: teamName,
-    },
-    { status: 404 }
-  );
 }
+
