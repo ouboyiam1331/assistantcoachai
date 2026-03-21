@@ -3,6 +3,10 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --tgem-surface: #ffffff;
+  --tgem-border: #e4e7ec;
+  --tgem-muted: #475467;
+  --tgem-accent: #0f4c5c;
 }
 
 @theme inline {
@@ -22,5 +26,67 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), sans-serif;
+}
+
+.tgem-shell {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.tgem-card {
+  border: 1px solid var(--tgem-border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fff 0%, #fcfdff 100%);
+  box-shadow: 0 1px 2px rgb(16 24 40 / 5%);
+}
+
+.tgem-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--tgem-border);
+  border-radius: 8px;
+  color: var(--tgem-accent);
+  text-decoration: none;
+  background: #fff;
+}
+
+.tgem-back-link:hover {
+  background: #f8fafc;
+}
+
+.tgem-label-muted {
+  color: var(--tgem-muted);
+}
+
+.tgem-ad-slot {
+  width: 100%;
+  border: 1px dashed #c5ccd7;
+  border-radius: 10px;
+  background: repeating-linear-gradient(
+    45deg,
+    #f8fafc,
+    #f8fafc 10px,
+    #f1f5f9 10px,
+    #f1f5f9 20px
+  );
+  color: #475467;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.tgem-tm {
+  font-size: 0.5em;
+  line-height: 0;
+  vertical-align: super;
+  position: relative;
+  top: -0.15em;
+  letter-spacing: 0;
 }

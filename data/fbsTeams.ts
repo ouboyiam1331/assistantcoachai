@@ -87,15 +87,17 @@ export const FBS_TEAMS: FbsTeam[] = [
   { name: "Liberty", slug: "liberty", conference: "C-USA" },
   { name: "Louisiana Tech", slug: "louisiana-tech", conference: "C-USA" },
   { name: "Middle Tennessee", slug: "middle-tennessee", conference: "C-USA" },
+  { name: "Missouri State", slug: "missouri-state", conference: "C-USA" },
   { name: "New Mexico State", slug: "new-mexico-state", conference: "C-USA" },
   { name: "Sam Houston", slug: "sam-houston", conference: "C-USA" },
+  { name: "Delaware", slug: "delaware", conference: "C-USA" },
   { name: "UTEP", slug: "utep", conference: "C-USA" },
   { name: "Western Kentucky", slug: "western-kentucky", conference: "C-USA" },
 
   // Independents
   { name: "Notre Dame", slug: "notre-dame", conference: "Independents" },
   { name: "UConn", slug: "uconn", conference: "Independents" },
-  { name: "UMass", slug: "umass", conference: "Independents" },
+  { name: "Massachusetts", slug: "umass", conference: "MAC" },
 
   // MAC
   { name: "Akron", slug: "akron", conference: "MAC" },

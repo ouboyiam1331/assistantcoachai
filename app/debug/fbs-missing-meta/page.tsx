@@ -28,7 +28,7 @@ export default function DebugFbsMissingMetaPage() {
     const q = query.trim().toLowerCase();
 
     return FBS_TEAMS.map((t) => {
-      const meta = (TEAM_META as any)[t.slug] ?? null;
+      const meta = TEAM_META[t.slug as keyof typeof TEAM_META] ?? null;
       const hasMeta = !!meta;
       const hasLogo = !!meta?.logos?.[0];
 

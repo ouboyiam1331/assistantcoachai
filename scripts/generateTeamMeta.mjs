@@ -60,10 +60,6 @@ const NAME_ALIASES = {
   LSU: "Louisiana State",
 };
 
-function tsEscape(str) {
-  return String(str ?? "").replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$/g, "\\$");
-}
-
 async function loadFbsTeams() {
   // Import your TS module at runtime (works in Node when using file URL)
   const fbsTeamsPath = path.join(process.cwd(), "data", "fbsTeams.ts");
@@ -121,7 +117,8 @@ async function main() {
       classification: cfbd.classification ?? "FBS",
       color: cfbd.color ?? null,
       alt_color: cfbd.alt_color ?? null,
-      logos: Array.isArray(cfbd.logos) ? cfbd.logos : [],
+      // Intentionally omit logos to avoid trademark/copyright risk.
+      logos: [],
       location: cfbd.location
         ? {
             venue_id: cfbd.location.venue_id ?? null,

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:smoke": "npm run build && playwright test tests/pickem.smoke.spec.ts",
+    "colors:import:fbs": "node scripts/import-team-colors.mjs"
   },
   "dependencies": {
     "next": "16.0.7",
@@ -15,6 +17,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@playwright/test": "^1.56.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

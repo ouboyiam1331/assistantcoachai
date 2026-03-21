@@ -1,71 +1,72 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { createSlate } from "@/lib/pickem/storage";
+import { LeagueKey, leagueConfig } from "@/lib/leagues/config";
 
 export default function NewSlatePage() {
+  const router = useRouter();
   const [slateName, setSlateName] = useState("");
   const [season, setSeason] = useState(2025);
   const [weekNumber, setWeekNumber] = useState<number | "">("");
-  const [mode, setMode] = useState<"college-fbs" | "college-fcs" | "nfl">(
-    "college-fbs"
-  );
+  const [weekOrRound, setWeekOrRound] = useState("");
+  const [mode, setMode] = useState<"college-fbs" | "college-fcs" | "nfl">("college-fbs");
+
+  const modeLeague: Record<typeof mode, LeagueKey> = {
+    "college-fbs": LeagueKey.FBS,
+    "college-fcs": LeagueKey.FCS,
+    nfl: LeagueKey.NFL,
+  };
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    console.log("New slate data:", {
+    const week = Number(weekNumber);
+    const slate = createSlate({
       slateName,
       season,
-      weekNumber,
+      week,
+      weekOrRound: weekOrRound || String(week),
       mode,
+      league: modeLeague[mode],
+      createdBy: "local-dev",
     });
-
-    alert(
-      `Slate created (not saved yet):\n\nName: ${slateName}\nSeason: ${season}\nWeek: ${weekNumber}\nMode: ${mode}`
-    );
+    router.push(`/pickem/slate?id=${encodeURIComponent(slate.id)}`);
   }
 
   return (
     <main className="min-h-screen bg-gray-100 p-6">
-      {/* Breadcrumbs */}
       <div className="mb-6 flex flex-wrap items-center gap-3 text-sm text-gray-900">
         <Link href="/pickem" className="hover:underline">
-          ← Back to Pick&apos;em Hub
+          ? Back to Pick&apos;em Hub
         </Link>
       </div>
 
       <section className="max-w-3xl mx-auto rounded-xl bg-white p-6 shadow border border-gray-200">
-        <h1 className="text-2xl font-bold mb-2 text-gray-900">
-          Create a New Pick&apos;em Slate
-        </h1>
+        <h1 className="text-2xl font-bold mb-2 text-gray-900">Create a New Pick&apos;em Slate</h1>
         <p className="text-sm text-gray-900 mb-6 leading-relaxed">
           Define the basics for this slate. In later steps, you&apos;ll add games and
           let TGEM analyze each matchup.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Slate Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">
-              Slate Name
-            </label>
+            <label className="block text-sm font-medium text-gray-900 mb-1">Slate Name</label>
             <input
               type="text"
               value={slateName}
               onChange={(e) => setSlateName(e.target.value)}
-              placeholder='e.g., "Week 1 – Opening Weekend"'
+              placeholder='e.g., "Week 1 - Opening Weekend"'
               className="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-700"
               required
             />
           </div>
 
-          {/* Season + Week */}
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">
-                Season (Year)
-              </label>
+              <label className="block text-sm font-medium text-gray-900 mb-1">Season (Year)</label>
               <input
                 type="number"
                 value={season}
@@ -77,9 +78,7 @@ export default function NewSlatePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">
-                Week Number
-              </label>
+              <label className="block text-sm font-medium text-gray-900 mb-1">Week Number</label>
               <input
                 type="number"
                 value={weekNumber}
@@ -89,18 +88,26 @@ export default function NewSlatePage() {
                 }}
                 className="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-700"
                 min={1}
-                max={20}
+                max={30}
                 placeholder="e.g., 1, 2, 3..."
                 required
               />
             </div>
           </div>
 
-          {/* Mode / Slate Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
-              Slate Type
-            </label>
+            <label className="block text-sm font-medium text-gray-900 mb-1">Week or Round Label</label>
+            <input
+              type="text"
+              value={weekOrRound}
+              onChange={(e) => setWeekOrRound(e.target.value)}
+              className="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-700"
+              placeholder="e.g., Week 1, Conference Championship, Round of 64"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-2">Slate Type</label>
             <div className="grid gap-3 md:grid-cols-3">
               <button
                 type="button"
@@ -111,7 +118,7 @@ export default function NewSlatePage() {
                     : "border-gray-400 text-gray-900 hover:bg-gray-100"
                 }`}
               >
-                College – FBS
+                {leagueConfig.FBS.label}
               </button>
               <button
                 type="button"
@@ -122,7 +129,7 @@ export default function NewSlatePage() {
                     : "border-gray-400 text-gray-900 hover:bg-gray-100"
                 }`}
               >
-                College – FCS
+                {leagueConfig.FCS.label}
               </button>
               <button
                 type="button"
@@ -133,26 +140,23 @@ export default function NewSlatePage() {
                     : "border-gray-400 text-gray-900 hover:bg-gray-100"
                 }`}
               >
-                NFL
+                {leagueConfig.NFL.label}
               </button>
             </div>
           </div>
 
-          {/* Submit */}
           <div className="pt-2 flex gap-3 items-center">
             <button
               type="submit"
               className="rounded-lg bg-emerald-700 px-6 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
             >
-              Continue (Temp: Just Logs)
+              Continue to Slate
             </button>
-            <p className="text-xs text-gray-900">
-              Later this will save the slate and send you into the &quot;Add
-              Games&quot; step.
-            </p>
+            <p className="text-xs text-gray-900">Next: load week games and start making picks.</p>
           </div>
         </form>
       </section>
     </main>
   );
 }
+

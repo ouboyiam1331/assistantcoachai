@@ -1,179 +1,104 @@
-// app/api/cfbd/fbs/schedule/[team]/route.ts
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { CfbdHttpError, cfbdGetJson } from "@/lib/cfbd/http";
+import { getDefaultCfbSeasonYear } from "@/lib/cfbd/season";
+import { resolveCfbdTeamName } from "@/lib/cfbd/teamName";
 
-type CFBDScheduleGame = {
-  id?: number;
-  week?: number;
-  season?: number;
-  seasonType?: string; // "regular" | "postseason" | etc
-  startDate?: string;
-  startTimeTBD?: boolean;
-  neutralSite?: boolean;
-  conferenceGame?: boolean;
-
-  homeTeam?: string;
-  awayTeam?: string;
-  homePoints?: number | null;
-  awayPoints?: number | null;
-
-  venue?: string | null;
+type ScheduleAttempt = {
+  year: string;
+  seasonType: string;
+  teamSent: string;
 };
 
-function getAuthHeader() {
-  const key = process.env.CFBD_API_KEY;
-  if (!key) return null;
-  return { Authorization: `Bearer ${key}` };
-}
+function getTeamFromParamsOrPath(req: Request, paramsTeam?: string) {
+  if (paramsTeam && String(paramsTeam).trim()) return String(paramsTeam).trim();
 
-async function fetchGamesFromCFBD(url: string) {
-  const auth = getAuthHeader();
-  if (!auth) {
-    return {
-      ok: false,
-      error: "Missing CFBD_API_KEY env var",
-      url,
-      games: [] as CFBDScheduleGame[],
-    };
-  }
-
-  const res = await fetch(url, {
-    headers: {
-      ...auth,
-      Accept: "application/json",
-    },
-    // avoid caching during dev
-    cache: "no-store",
-  });
-
-  const text = await res.text();
-
-  // CFBD should return JSON; if it returns HTML, we'll show it as an error
-  let data: any = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    return {
-      ok: false,
-      error: `Non-JSON response from CFBD (${res.status})`,
-      url,
-      raw: text.slice(0, 500),
-      games: [] as CFBDScheduleGame[],
-    };
-  }
-
-  if (!res.ok) {
-    const msg =
-      (data && (data.message || data.error)) ||
-      `CFBD request failed (${res.status})`;
-    return { ok: false, error: msg, url, games: [] as CFBDScheduleGame[] };
-  }
-
-  return { ok: true, url, games: Array.isArray(data) ? data : [] };
+  // Fallback: parse from URL path if Next gives params as {}
+  // Example: /api/cfbd/fbs/schedule/miami-fl?year=2025
+  const url = new URL(req.url);
+  const parts = url.pathname.split("/").filter(Boolean);
+  const idx = parts.lastIndexOf("schedule");
+  const fromPath = idx >= 0 ? parts[idx + 1] : "";
+  return fromPath ? decodeURIComponent(fromPath) : "";
 }
 
 export async function GET(
-  req: Request,
-  ctx: { params: Promise<{ team: string }> | { team: string } }
+  req: NextRequest,
+  ctx: { params: Promise<{ team: string }> },
 ) {
   try {
-    // Next can pass params sync or async depending on version/build
-    const params =
-      ctx.params instanceof Promise ? await ctx.params : ctx.params;
+    const { team } = await ctx.params;
+    const { searchParams } = new URL(req.url);
+    const requestedYear =
+      searchParams.get("year") ?? String(getDefaultCfbSeasonYear());
 
-    const teamSlug = params?.team;
+    const teamSlug = getTeamFromParamsOrPath(req, team);
 
     if (!teamSlug) {
       return NextResponse.json(
-        { ok: false, error: "Missing team slug in route params" },
-        { status: 400 }
+        { ok: false, error: "Missing team parameter" },
+        { status: 400 },
       );
     }
 
-    const { searchParams } = new URL(req.url);
-    const yearStr = searchParams.get("year") || "";
-    const requestedYear = yearStr || String(new Date().getFullYear());
+    const yearNum = Number(requestedYear);
+    const yearsToTry = [yearNum, yearNum - 1];
 
-    // CFBD "team" expects the team name used by CFBD. In your app you're passing slug.
-    // We try a few variants:
-    // 1) team=teamSlug (your slug)
-    // 2) team=teamSlug with hyphens -> spaces and title-ish preserved
-    // 3) also try previous year if current year has no schedule published yet
-    const attempts: Array<{ year: string; seasonType?: string; teamSent: string }> =
-      [];
+    const teamSent = resolveCfbdTeamName(teamSlug);
 
-    const teamSent1 = teamSlug;
-    const teamSent2 = teamSlug.replace(/-/g, " ");
+    const attempts: ScheduleAttempt[] = [];
+    const cfbdErrors: { year: number; status: number; detail: string }[] = [];
+    let games: unknown[] = [];
+    let resolvedYear: number | null = null;
+    let finalUrl: string | null = null;
 
-    const yearsToTry = [requestedYear, String(Number(requestedYear) - 1)];
-    const seasonTypesToTry: Array<string | undefined> = [
-      undefined, // default
-      "regular",
-      "both",
-    ];
+    for (const y of yearsToTry) {
+      const seasonType = "both"; // include postseason
+      attempts.push({ year: String(y), seasonType, teamSent });
 
-    let finalGames: CFBDScheduleGame[] = [];
-    let resolvedYear: string | null = null;
-    let resolvedTeamSent: string | null = null;
-    let usedUrl: string | null = null;
-
-    for (const year of yearsToTry) {
-      for (const seasonType of seasonTypesToTry) {
-        for (const teamSent of [teamSent1, teamSent2]) {
-          const base = "https://api.collegefootballdata.com/games";
-          const qs = new URLSearchParams();
-          qs.set("year", year);
-          qs.set("team", teamSent);
-          if (seasonType) qs.set("seasonType", seasonType);
-
-          const url = `${base}?${qs.toString()}`;
-          const result = await fetchGamesFromCFBD(url);
-
-          attempts.push({ year, seasonType, teamSent });
-
-          if (result.ok && result.games.length > 0) {
-            finalGames = result.games;
-            resolvedYear = year;
-            resolvedTeamSent = teamSent;
-            usedUrl = url;
-            break;
-          }
-
-          // keep last url for debugging
-          usedUrl = url;
+      try {
+        const data = await cfbdGetJson<unknown>(
+          "/games",
+          { year: y, team: teamSent, seasonType },
+          {
+            cacheTtlMs: 1000 * 60 * 60 * 12,
+            team: teamSent,
+            mockFactory: () => [],
+          },
+        );
+        const arr = Array.isArray(data) ? data : [];
+        finalUrl = `/games?year=${y}&team=${encodeURIComponent(teamSent)}&seasonType=${seasonType}`;
+        if (arr.length > 0) {
+          games = arr;
+          resolvedYear = y;
+          break;
         }
-        if (finalGames.length) break;
+      } catch (err: unknown) {
+        if (err instanceof CfbdHttpError) {
+          cfbdErrors.push({ year: y, status: err.status, detail: err.detail.slice(0, 400) });
+        } else {
+          cfbdErrors.push({ year: y, status: 500, detail: err instanceof Error ? err.message : "CFBD error" });
+        }
+        continue;
       }
-      if (finalGames.length) break;
     }
-
-    // Sort by week then date (nice for table)
-    finalGames.sort((a, b) => {
-      const wa = a.week ?? 999;
-      const wb = b.week ?? 999;
-      if (wa !== wb) return wa - wb;
-      const da = a.startDate ? Date.parse(a.startDate) : 0;
-      const db = b.startDate ? Date.parse(b.startDate) : 0;
-      return da - db;
-    });
 
     return NextResponse.json({
       ok: true,
       requestedYear,
       resolvedYear,
       teamSlug,
-      teamSent: resolvedTeamSent,
-      url: usedUrl,
-      count: finalGames.length,
+      teamSent,
+      url: finalUrl,
+      count: games.length,
       attempts,
-      games: finalGames,
+      games,
+      cfbdErrors: cfbdErrors.length ? cfbdErrors : undefined,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unexpected server error";
     return NextResponse.json(
-      {
-        ok: false,
-        error: err?.message || "Unknown error",
-      },
-      { status: 500 }
+      { ok: false, error: message },
+      { status: 500 },
     );
   }
 }

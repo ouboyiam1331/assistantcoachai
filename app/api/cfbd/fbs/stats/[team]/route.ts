@@ -1,79 +1,57 @@
-// app/api/cfbd/fbs/stats/[team]/route.ts
-import { NextResponse } from "next/server";
-import { FBS_TEAMS } from "@/data/fbsTeams";
-import { getTeamMeta } from "@/data/teamMeta";
-
-function slugToTeamName(slug: string) {
-  const fromList = FBS_TEAMS.find((t) => t.slug === slug)?.name;
-  const fromMeta = getTeamMeta(slug)?.name;
-  return fromList ?? fromMeta ?? slug;
-}
+import { NextResponse, type NextRequest } from "next/server";
+import { CfbdHttpError, cfbdGetJson, cfbdMockModeEnabled } from "@/lib/cfbd/http";
+import { resolveCfbdTeamName } from "@/lib/cfbd/teamName";
 
 export async function GET(
-  req: Request,
-  { params }: { params: { team: string } }
+  req: NextRequest,
+  ctx: { params: Promise<{ team: string }> },
 ) {
   try {
-    const slug = params?.team;
+    const { team: slug } = await ctx.params;
     const { searchParams } = new URL(req.url);
     const year = searchParams.get("year") ?? "2025";
 
     if (!slug) {
       return NextResponse.json(
         { ok: false, error: "Missing team slug in route params" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const teamName = slugToTeamName(slug);
-
-    const apiKey = process.env.CFBD_API_KEY;
-    if (!apiKey) {
+    if (!process.env.CFBD_API_KEY && !cfbdMockModeEnabled()) {
       return NextResponse.json(
         { ok: false, error: "Missing CFBD_API_KEY env var" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
-    // CFBD endpoint (season stats). This commonly returns an array of stat objects.
-    // If your existing schedule route uses a different base URL, match that.
-    const url = new URL("https://api.collegefootballdata.com/stats/season");
-    url.searchParams.set("year", String(year));
-    url.searchParams.set("team", teamName);
+    const teamName = resolveCfbdTeamName(slug);
 
-    const res = await fetch(url.toString(), {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        Accept: "application/json",
-      },
-      // helps avoid weird caching while developing
-      cache: "no-store",
-    });
-
-    const text = await res.text();
-
-    if (!res.ok) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: `CFBD stats request failed (${res.status})`,
-          details: text.slice(0, 500),
-        },
-        { status: res.status }
-      );
-    }
-
-    let json: any = null;
+    let json: unknown = null;
     try {
-      json = JSON.parse(text);
-    } catch {
+      json = await cfbdGetJson<unknown>(
+        "/stats/season",
+        { year: String(year), team: teamName },
+        { cacheTtlMs: 1000 * 60 * 60 * 24, team: teamName, mockFactory: () => [] },
+      );
+    } catch (err: unknown) {
+      if (err instanceof CfbdHttpError) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `CFBD stats request failed (${err.status})`,
+            details: err.detail.slice(0, 500),
+            url: err.url,
+          },
+          { status: err.status },
+        );
+      }
       return NextResponse.json(
         {
           ok: false,
-          error: "CFBD stats response was not valid JSON",
-          details: text.slice(0, 200),
+          error: err instanceof Error ? err.message : "CFBD stats request failed",
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -84,10 +62,11 @@ export async function GET(
       year: Number(year),
       raw: json,
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Unknown error";
     return NextResponse.json(
-      { ok: false, error: e?.message ?? "Unknown error" },
-      { status: 500 }
+      { ok: false, error: message },
+      { status: 500 },
     );
   }
 }

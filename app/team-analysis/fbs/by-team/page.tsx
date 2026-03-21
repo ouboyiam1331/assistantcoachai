@@ -1,22 +1,60 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { FBS_TEAMS } from "@/data/fbsTeams";
+import { useEffect, useMemo, useState } from "react";
+
+type FbsTeam = {
+  id: number | null;
+  school: string;
+  conference: string | null;
+  slug: string;
+};
 
 export default function FbsByTeamPage() {
+  const [teams, setTeams] = useState<FbsTeam[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const year = useMemo(() => new Date().getFullYear(), []);
 
-  const sortedTeams = useMemo(() => {
-    return [...FBS_TEAMS].sort((a, b) => a.name.localeCompare(b.name));
-  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/cfbd/fbs/teams?year=${year}`, {
+          cache: "no-store",
+        });
+        const data = await res.json();
+        if (!res.ok || data?.ok === false) {
+          throw new Error(data?.error ?? `Teams request failed (${res.status})`);
+        }
+        const list = Array.isArray(data?.teams) ? (data.teams as FbsTeam[]) : [];
+        if (!cancelled) setTeams(list);
+      } catch (e: unknown) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Unknown error");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [year]);
+
+  const sortedTeams = useMemo(
+    () => [...teams].sort((a, b) => a.school.localeCompare(b.school)),
+    [teams],
+  );
 
   const filteredTeams = useMemo(() => {
     const q = query.toLowerCase().trim();
     if (!q) return sortedTeams;
-    return sortedTeams.filter((team) =>
-      team.name.toLowerCase().includes(q)
-    );
+    return sortedTeams.filter((team) => team.school.toLowerCase().includes(q));
   }, [query, sortedTeams]);
 
   return (
@@ -37,8 +75,9 @@ export default function FbsByTeamPage() {
         </h1>
 
         <p className="mt-4 text-gray-900 text-center max-w-2xl mx-auto">
-          Start typing to search for an FBS team, then tap it to open a TGEM
-          team overview page for that program.
+          Start typing to search for an FBS team, then tap it to open a TGEM team
+          overview page for that program. Conference alignment is checked against
+          CFBD for season {year}.
         </p>
 
         <div className="mt-8 w-full">
@@ -51,6 +90,9 @@ export default function FbsByTeamPage() {
           />
         </div>
 
+        {loading ? <div className="mt-6">Loading teams...</div> : null}
+        {error ? <div className="mt-6 text-red-700">Error: {error}</div> : null}
+
         <div className="mt-6 w-full border-t border-gray-300 pt-4">
           {filteredTeams.length === 0 ? (
             <p className="text-center text-gray-900">
@@ -61,10 +103,10 @@ export default function FbsByTeamPage() {
               {filteredTeams.map((team) => (
                 <li key={team.slug}>
                   <Link
-                    href={`/team-analysis/fbs/${team.slug}`}
+                    href={`/team-analysis/fbs/${team.slug}?from=by-team`}
                     className="block w-full rounded-lg bg-white px-4 py-3 text-gray-900 shadow-sm hover:bg-gray-100 border border-gray-200"
                   >
-                    {team.name}
+                    {team.school}
                   </Link>
                 </li>
               ))}
