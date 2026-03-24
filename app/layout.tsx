@@ -1,5 +1,6 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import SiteChrome from "@/components/layout/SiteChrome";
 import "./globals.css";
 
@@ -26,6 +27,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <Script
+          id="google-adsense-site-verification"
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5009402663425957"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
         <SiteChrome>{children}</SiteChrome>
       </body>
     </html>
