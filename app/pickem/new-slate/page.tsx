@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { createSlate } from "@/lib/pickem/storage";
+import {
+  createSlate,
+  type PickemEntryMode,
+  type PickemMode,
+  type PickemPhase,
+} from "@/lib/pickem/storage";
 import { LeagueKey, leagueConfig } from "@/lib/leagues/config";
 
 export default function NewSlatePage() {
@@ -12,11 +17,12 @@ export default function NewSlatePage() {
   const [season, setSeason] = useState(2025);
   const [weekNumber, setWeekNumber] = useState<number | "">("");
   const [weekOrRound, setWeekOrRound] = useState("");
-  const [mode, setMode] = useState<"college-fbs" | "college-fcs" | "nfl">("college-fbs");
+  const [mode, setMode] = useState<PickemMode>("college");
+  const [entryMode, setEntryMode] = useState<PickemEntryMode>("auto");
+  const [phase, setPhase] = useState<PickemPhase>("regular");
 
   const modeLeague: Record<typeof mode, LeagueKey> = {
-    "college-fbs": LeagueKey.FBS,
-    "college-fcs": LeagueKey.FCS,
+    college: LeagueKey.FBS,
     nfl: LeagueKey.NFL,
   };
 
@@ -30,6 +36,8 @@ export default function NewSlatePage() {
       week,
       weekOrRound: weekOrRound || String(week),
       mode,
+      entryMode,
+      phase,
       league: modeLeague[mode],
       createdBy: "local-dev",
     });
@@ -107,42 +115,78 @@ export default function NewSlatePage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">Slate Type</label>
-            <div className="grid gap-3 md:grid-cols-3">
+            <label className="block text-sm font-medium text-gray-900 mb-2">TGEM Phase</label>
+            <select
+              value={phase}
+              onChange={(e) => setPhase(e.target.value as PickemPhase)}
+              className="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-700"
+            >
+              <option value="regular">Regular Season</option>
+              <option value="championship">Championship</option>
+              <option value="postseason">Bowl / CFP / Postseason</option>
+            </select>
+            <p className="mt-2 text-xs text-gray-700">
+              TGEM applies phase-specific weighting from your selected phase.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-2">League</label>
+            <div className="grid gap-3 md:grid-cols-2">
               <button
                 type="button"
-                onClick={() => setMode("college-fbs")}
+                onClick={() => setMode("college")}
                 className={`rounded-lg border px-3 py-2 text-sm ${
-                  mode === "college-fbs"
+                  mode === "college"
                     ? "border-red-700 bg-red-50 text-red-900"
                     : "border-gray-400 text-gray-900 hover:bg-gray-100"
                 }`}
               >
-                {leagueConfig.FBS.label}
+                College Football
               </button>
               <button
                 type="button"
-                onClick={() => setMode("college-fcs")}
+                disabled
                 className={`rounded-lg border px-3 py-2 text-sm ${
-                  mode === "college-fcs"
-                    ? "border-red-700 bg-red-50 text-red-900"
-                    : "border-gray-400 text-gray-900 hover:bg-gray-100"
+                  "border-gray-300 text-gray-500 bg-gray-100 cursor-not-allowed"
                 }`}
               >
-                {leagueConfig.FCS.label}
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("nfl")}
-                className={`rounded-lg border px-3 py-2 text-sm ${
-                  mode === "nfl"
-                    ? "border-red-700 bg-red-50 text-red-900"
-                    : "border-gray-400 text-gray-900 hover:bg-gray-100"
-                }`}
-              >
-                {leagueConfig.NFL.label}
+                {leagueConfig.NFL.label} (Coming Soon)
               </button>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-2">Slate Setup</label>
+            <div className="grid gap-3 md:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setEntryMode("auto")}
+                className={`rounded-lg border px-3 py-2 text-sm ${
+                  entryMode === "auto"
+                    ? "border-red-700 bg-red-50 text-red-900"
+                    : "border-gray-400 text-gray-900 hover:bg-gray-100"
+                }`}
+              >
+                Auto (All Games)
+              </button>
+              <button
+                type="button"
+                onClick={() => setEntryMode("manual")}
+                className={`rounded-lg border px-3 py-2 text-sm ${
+                  entryMode === "manual"
+                    ? "border-red-700 bg-red-50 text-red-900"
+                    : "border-gray-400 text-gray-900 hover:bg-gray-100"
+                }`}
+              >
+                Manual (Pick Games)
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-gray-700">
+              {entryMode === "auto"
+                ? "Auto loads the full week slate."
+                : "Manual lets you add only the matchups you want."}
+            </p>
           </div>
 
           <div className="pt-2 flex gap-3 items-center">

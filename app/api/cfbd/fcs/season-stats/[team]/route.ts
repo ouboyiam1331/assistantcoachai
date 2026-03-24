@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { CfbdHttpError, cfbdGetJson, cfbdMockModeEnabled } from "@/lib/cfbd/http";
 import { findFcsTeamBySlug, resolveTeamFromParamsOrPath } from "@/lib/cfbd/fcs";
-import { getDefaultCfbSeasonYear } from "@/lib/cfbd/season";
+import { getStatsSeasonYear } from "@/lib/cfbd/season";
 
 type TeamGameStat = {
   category?: unknown;
@@ -314,7 +314,7 @@ export async function GET(
     const { searchParams } = new URL(req.url);
     const teamSlug = resolveTeamFromParamsOrPath(req, "season-stats", team);
     const yearRaw =
-      searchParams.get("year") ?? String(getDefaultCfbSeasonYear());
+      searchParams.get("year") ?? String(getStatsSeasonYear());
     const year = Number(yearRaw);
     const seasonType = searchParams.get("seasonType") ?? "both";
 

@@ -31,7 +31,9 @@ export type SlateRecord = {
   pending: number;
 };
 
-export type PickemMode = "college-fbs" | "college-fcs" | "nfl";
+export type PickemMode = "college" | "nfl";
+export type PickemEntryMode = "auto" | "manual";
+export type PickemPhase = "regular" | "championship" | "postseason";
 
 export type PickemSlate = SlateSchema & {
   // normalized fields
@@ -49,29 +51,37 @@ export type PickemSlate = SlateSchema & {
   slateName: string;
   week: number;
   mode: PickemMode;
+  entryMode: PickemEntryMode;
+  phase: PickemPhase;
   picks: Record<string, PickChoice>;
   suggestions: Record<string, GameSuggestion>;
   games: SlateGame[];
   record: SlateRecord;
 };
 
-const KEY = "assistantcoachai_pickem_slates_v1";
-const AUTO_SYNC_MS = 60_000;
+const KEY = "assistantcoachai_pickem_slates_v3";
+const LAST_SYNC_KEY = "assistantcoachai_pickem_last_sync_ms_v1";
+const MIN_SYNC_GAP_MS = 90_000;
+const AUTO_SYNC_MS = 300_000;
 
 function canUseStorage() {
   return typeof window !== "undefined" && !!window.localStorage;
 }
 
 function modeToLeague(mode: PickemMode): LeagueKey {
-  if (mode === "college-fcs") return LeagueKey.FCS;
   if (mode === "nfl") return LeagueKey.NFL;
   return LeagueKey.FBS;
 }
 
 function leagueToMode(league: LeagueKey): PickemMode {
-  if (league === LeagueKey.FCS) return "college-fcs";
   if (league === LeagueKey.NFL) return "nfl";
-  return "college-fbs";
+  return "college";
+}
+
+function derivePhaseFromWeek(week: number): PickemPhase {
+  if (week >= 16) return "postseason";
+  if (week >= 14) return "championship";
+  return "regular";
 }
 
 function picksMapToArray(picks: Record<string, PickChoice>): SlateUserPick[] {
@@ -102,10 +112,15 @@ function normalizeSlate(raw: Partial<PickemSlate>): PickemSlate | null {
   const id = raw.id ?? raw.slateId;
   if (!id) return null;
 
-  const mode: PickemMode =
-    raw.mode === "college-fcs" || raw.mode === "nfl" ? raw.mode : "college-fbs";
+  const mode: PickemMode = raw.mode === "nfl" ? "nfl" : "college";
+  const entryMode: PickemEntryMode =
+    raw.entryMode === "manual" ? "manual" : "auto";
   const league = raw.league ?? modeToLeague(mode);
   const weekNum = typeof raw.week === "number" ? raw.week : Number(raw.weekOrRound ?? 1) || 1;
+  const phase: PickemPhase =
+    raw.phase === "postseason" || raw.phase === "championship" || raw.phase === "regular"
+      ? raw.phase
+      : derivePhaseFromWeek(weekNum);
   const games = Array.isArray(raw.games) ? raw.games : [];
   const picks = raw.picks ?? {};
   const suggestions = raw.suggestions ?? {};
@@ -131,6 +146,8 @@ function normalizeSlate(raw: Partial<PickemSlate>): PickemSlate | null {
     slateName: String(raw.slateName ?? raw.name ?? "New Slate"),
     week: weekNum,
     mode: raw.mode ?? leagueToMode(league),
+    entryMode,
+    phase,
     picks,
     suggestions,
     games,
@@ -210,6 +227,8 @@ export function createSlate(input: {
   week?: number;
   weekOrRound?: string;
   mode?: PickemMode;
+  entryMode?: PickemEntryMode;
+  phase?: PickemPhase;
   league?: LeagueKey;
   createdBy?: string;
 }) {
@@ -230,6 +249,8 @@ export function createSlate(input: {
     season: input.season,
     week: weekNum,
     weekOrRound,
+    entryMode: input.entryMode ?? "auto",
+    phase: input.phase ?? derivePhaseFromWeek(weekNum),
     createdBy: input.createdBy ?? "local-dev",
     createdAt: now,
     updatedAt: now,
@@ -322,8 +343,8 @@ function sameRecord(a: SlateRecord, b: SlateRecord) {
   );
 }
 
-function deriveSeasonType(week: number): "regular" | "postseason" {
-  return week >= 16 ? "postseason" : "regular";
+function deriveSeasonType(phase: PickemPhase): "regular" | "postseason" {
+  return phase === "postseason" ? "postseason" : "regular";
 }
 
 async function fetchWeekGames(
@@ -351,20 +372,33 @@ async function fetchWeekGames(
   return rows.map((g, i) => toSlateGame(g, i));
 }
 
-export async function syncFbsSlatesFromApi() {
+export async function syncFbsSlatesFromApi(options?: { force?: boolean }) {
   if (!canUseStorage()) {
-    return { checked: 0, updated: 0, errors: [] as string[] };
+    return { checked: 0, updated: 0, errors: [] as string[], skipped: true };
   }
 
-  const slates = listSlates().filter((s) => s.mode === "college-fbs");
+  const force = options?.force === true;
+  const now = Date.now();
+  if (!force) {
+    const lastSyncMs = Number(window.localStorage.getItem(LAST_SYNC_KEY) ?? "0");
+    if (Number.isFinite(lastSyncMs) && now - lastSyncMs < MIN_SYNC_GAP_MS) {
+      return { checked: 0, updated: 0, errors: [] as string[], skipped: true };
+    }
+  }
+
+  const slates = listSlates().filter(
+    (s) => s.mode === "college" && (s.entryMode ?? "auto") === "auto",
+  );
   if (slates.length === 0) {
-    return { checked: 0, updated: 0, errors: [] as string[] };
+    window.localStorage.setItem(LAST_SYNC_KEY, String(now));
+    return { checked: 0, updated: 0, errors: [] as string[], skipped: false };
   }
 
   const groups = new Map<string, PickemSlate[]>();
   for (const s of slates) {
-    const seasonType = deriveSeasonType(s.week);
-    const key = `${s.season}:${s.week}:${seasonType}`;
+    const phase = s.phase ?? derivePhaseFromWeek(s.week);
+    const seasonType = deriveSeasonType(phase);
+    const key = `${s.season}:${s.week}:${phase}:${seasonType}`;
     const arr = groups.get(key) ?? [];
     arr.push(s);
     groups.set(key, arr);
@@ -375,7 +409,7 @@ export async function syncFbsSlatesFromApi() {
   const errors: string[] = [];
 
   for (const [key, groupSlates] of groups.entries()) {
-    const [seasonRaw, weekRaw, seasonTypeRaw] = key.split(":");
+    const [seasonRaw, weekRaw, , seasonTypeRaw] = key.split(":");
     const season = Number(seasonRaw);
     const week = Number(weekRaw);
     const seasonType = seasonTypeRaw === "postseason" ? "postseason" : "regular";
@@ -407,7 +441,8 @@ export async function syncFbsSlatesFromApi() {
     }
   }
 
-  return { checked, updated, errors };
+  window.localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
+  return { checked, updated, errors, skipped: false };
 }
 
 export { AUTO_SYNC_MS };

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { FBS_TEAMS } from "@/data/fbsTeams";
 import { cfbdMockModeEnabled } from "@/lib/cfbd/http";
 import { fetchTeamPlayerSeasonRows, extractLeaders } from "@/lib/cfbd/leaders";
-import { getDefaultCfbSeasonYear } from "@/lib/cfbd/season";
+import { getStatsSeasonYear } from "@/lib/cfbd/season";
 import { resolveCfbdTeamName } from "@/lib/cfbd/teamName";
 
 function getTeamFromParamsOrPath(req: Request, paramsTeam?: string) {
@@ -38,7 +38,7 @@ export async function GET(
 
     const { searchParams } = new URL(req.url);
     const yearRaw =
-      searchParams.get("year") ?? String(getDefaultCfbSeasonYear());
+      searchParams.get("year") ?? String(getStatsSeasonYear());
     const year = Number(yearRaw);
     if (!Number.isFinite(year) || year < 1900) {
       return NextResponse.json(

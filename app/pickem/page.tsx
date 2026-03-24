@@ -275,7 +275,15 @@ export default function PickemHomePage() {
                     >
                       <div className="text-sm font-semibold text-gray-900">{s.slateName}</div>
                       <div className="text-xs text-gray-700">
-                        {s.season} Week {s.week} - {s.mode} - {s.locked ? "Locked" : "Open"}
+                        {s.season} Week {s.week} - {s.mode === "college" ? "College Football" : "NFL"} -{" "}
+                        {(s.phase ?? "regular") === "postseason"
+                          ? "Postseason"
+                          : (s.phase ?? "regular") === "championship"
+                            ? "Championship"
+                            : "Regular"}{" "}
+                        -{" "}
+                        {(s.entryMode ?? "auto") === "auto" ? "Auto" : "Manual"} -{" "}
+                        {s.locked ? "Locked" : "Open"}
                       </div>
                       <div className="text-xs text-gray-700">
                         Record: {s.record.wins}-{s.record.losses}

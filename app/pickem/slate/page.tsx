@@ -11,10 +11,25 @@ import {
   upsertSlate,
   type GameSuggestion,
   type PickChoice,
+  type PickemPhase,
   type PickemSlate,
   type SlateGame,
   type SlateRecord,
 } from "@/lib/pickem/storage";
+import { resolvePickemTeamIdentity } from "@/lib/pickem/teamSlug";
+
+const AUTO_PICK_CONFIDENCE_MIN = 60;
+
+const FBS_CONFERENCE_BY_SLUG = new Map(
+  FBS_TEAMS.map((t) => [t.slug, t.conference]),
+);
+
+function conferenceTier(conference?: string | null) {
+  const c = String(conference ?? "");
+  if (c === "SEC" || c === "Big Ten") return 3;
+  if (c === "ACC" || c === "Big 12") return 2;
+  return 1;
+}
 
 type WeekGame = {
   id?: number;
@@ -44,30 +59,6 @@ function fmtDate(s?: string | null) {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function normalizeTeamName(s: string) {
-  return s
-    .toLowerCase()
-    .replace(/\([^)]*\)/g, "")
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9]/g, "")
-    .trim();
-}
-
-function findSlugByTeamName(teamNameRaw: string | null | undefined) {
-  if (!teamNameRaw) return "";
-  const target = normalizeTeamName(teamNameRaw);
-
-  const exact = FBS_TEAMS.find((t) => normalizeTeamName(t.name) === target);
-  if (exact) return exact.slug;
-
-  const loose = FBS_TEAMS.find((t) => {
-    const n = normalizeTeamName(t.name);
-    return target.includes(n) || n.includes(target);
-  });
-
-  return loose ? loose.slug : "";
 }
 
 function toSlateGame(g: WeekGame, idx: number): SlateGame {
@@ -122,6 +113,110 @@ function derivePickemPhase(week: number): "regular" | "championship" | "postseas
   return "regular";
 }
 
+function phaseToLabel(phase: PickemPhase) {
+  if (phase === "postseason") return "Bowl / CFP / Postseason";
+  if (phase === "championship") return "Championship";
+  return "Regular Season";
+}
+
+function buildCoachLeanSynopsis(
+  suggestion: GameSuggestion | null,
+  game: SlateGame,
+  phase: "regular" | "championship" | "postseason",
+) {
+  if (!suggestion) return "";
+  const away = game.awayTeam ?? "Away";
+  const home = game.homeTeam ?? "Home";
+  const leaning = suggestion.pick === "home" ? home : away;
+  const pressureSide = suggestion.pick === "home" ? away : home;
+  const confidence =
+    typeof suggestion.confidence === "number"
+      ? `${Math.round(suggestion.confidence)}`
+      : "N/A";
+  const isDataStatusReason = (reason: string) => {
+    const r = reason.toLowerCase();
+    return (
+      r.includes("season stats loaded") ||
+      r.includes("yearused") ||
+      r.includes("missing") ||
+      r.includes("fallback") ||
+      r.includes("phase weights") ||
+      r.includes("module coverage") ||
+      r.includes("feature coverage")
+    );
+  };
+  const meaningful = suggestion.reasons.filter((r) => {
+    const text = String(r).trim();
+    return text.length > 0 && !isDataStatusReason(text);
+  });
+  const topReasonA = meaningful[0] ?? "cleaner execution profile";
+  const topReasonB = meaningful[1] ?? "better down-to-down consistency";
+  const swingFactor =
+    meaningful.find((r) => /turnover|availability|injury|volatility|penalt|red zone/i.test(r)) ??
+    "turnover control and red-zone execution";
+  const phaseLabel =
+    phase === "postseason" ? "postseason" : phase === "championship" ? "championship-week" : "regular-season";
+  const confidenceNum = typeof suggestion.confidence === "number" ? suggestion.confidence : null;
+  const confidenceTier =
+    confidenceNum == null ? "unknown" : confidenceNum >= 70 ? "high" : confidenceNum >= 56 ? "medium" : "low";
+
+  if (confidenceTier === "high") {
+    return `Coach read: TGEM leans ${leaning} (confidence ${confidence}) in this ${phaseLabel} lens with strong conviction. The edge is built on ${topReasonA} and ${topReasonB}. The swing factor is ${swingFactor}. ${pressureSide} needs early-down wins plus clean ball security to flip this.`;
+  }
+  if (confidenceTier === "medium") {
+    return `Coach read: TGEM leans ${leaning} (confidence ${confidence}) in this ${phaseLabel} lens, but this is still a playable fight. The edge comes from ${topReasonA} with support from ${topReasonB}. Swing factor: ${swingFactor}. ${pressureSide} can turn it with cleaner situational execution.`;
+  }
+  return `Coach read: this projects as a tight game in the ${phaseLabel} lens (confidence ${confidence}). TGEM gives a slight lean to ${leaning}, driven by ${topReasonA}, but the margin is thin and volatility is real. Biggest swing point: ${swingFactor}. ${pressureSide} can absolutely take this with a clean first half and turnover edge.`;
+}
+
+function summarizeTgemReasonsFromApi(data: unknown, lean: "HOME" | "AWAY" | string | null) {
+  const payload = (data ?? {}) as Record<string, unknown>;
+  const analysis = (payload.analysis ?? {}) as Record<string, unknown>;
+  const taggedReasonsRaw = Array.isArray(analysis.reasons) ? analysis.reasons : [];
+  const keyFactorsRaw = Array.isArray(analysis.keyFactors) ? analysis.keyFactors : [];
+  const fallbackReasonsRaw = Array.isArray(payload.reasons) ? payload.reasons : [];
+
+  const taggedReasons = taggedReasonsRaw
+    .map((r) => {
+      const row = (r ?? {}) as Record<string, unknown>;
+      return String(row.text ?? "").trim();
+    })
+    .filter((r) => r.length > 0);
+
+  const factorLines = keyFactorsRaw
+    .map((f) => {
+      const row = (f ?? {}) as Record<string, unknown>;
+      const label = String(row.label ?? "").trim();
+      const delta = typeof row.delta === "number" ? row.delta : null;
+      if (!label) return "";
+      if (delta == null) return `${label} is neutral`;
+      const side = delta > 0 ? "home side" : delta < 0 ? "away side" : "even";
+      return `${label} favors ${side} (${delta > 0 ? "+" : ""}${delta.toFixed(1)})`;
+    })
+    .filter((x) => x.length > 0);
+
+  const fallbackReasons = fallbackReasonsRaw
+    .map((r) => String(r ?? "").trim())
+    .filter((r) => r.length > 0);
+
+  const merged = [...factorLines, ...taggedReasons, ...fallbackReasons];
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  for (const reason of merged) {
+    const key = reason.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(reason);
+  }
+
+  if (unique.length > 0) return unique.slice(0, 8);
+  return [
+    lean === "AWAY"
+      ? "Overall matchup profile favors the away side"
+      : "Overall matchup profile favors the home side",
+  ];
+}
+
 function PickemSlatePageInner() {
   const search = useSearchParams();
   const slateId = search.get("id") ?? "";
@@ -133,8 +228,19 @@ function PickemSlatePageInner() {
   const [games, setGames] = useState<SlateGame[]>([]);
   const [picks, setPicks] = useState<Record<string, PickChoice>>({});
   const [suggestions, setSuggestions] = useState<Record<string, GameSuggestion>>({});
+  const [gameNotes, setGameNotes] = useState<Record<string, string>>({});
   const [locked, setLocked] = useState(false);
   const [record, setRecord] = useState<SlateRecord>({ wins: 0, losses: 0, pushes: 0, pending: 0 });
+  const [manualAwayTeam, setManualAwayTeam] = useState("");
+  const [manualHomeTeam, setManualHomeTeam] = useState("");
+  const [manualStartDate, setManualStartDate] = useState("");
+  const [manualVenue, setManualVenue] = useState("");
+  const [manualNeutralSite, setManualNeutralSite] = useState(false);
+  const hasSlate = Boolean(slate?.id);
+  const slateMode = slate?.mode;
+  const slateEntryMode = slate?.entryMode ?? "auto";
+  const slatePhase: PickemPhase =
+    slate?.phase ?? derivePickemPhase(slate?.week ?? 1);
 
   useEffect(() => {
     if (!slateId) {
@@ -152,14 +258,18 @@ function PickemSlatePageInner() {
     setGames(s.games ?? []);
     setPicks(s.picks ?? {});
     setSuggestions(s.suggestions ?? {});
+    setGameNotes({});
     setLocked(Boolean(s.locked));
     setRecord(s.record ?? { wins: 0, losses: 0, pushes: 0, pending: 0 });
   }, [slateId]);
 
   async function refreshGames(options?: { silent?: boolean }) {
     if (!slate) return;
-    if (slate.mode !== "college-fbs") {
-      setError("Only college-fbs slate mode is wired right now.");
+    if (slate.mode !== "college") {
+      setError("Only college football slate mode is wired right now.");
+      return;
+    }
+    if ((slate.entryMode ?? "auto") !== "auto") {
       return;
     }
 
@@ -169,7 +279,7 @@ function PickemSlatePageInner() {
     }
 
     try {
-      const phase = derivePickemPhase(slate.week);
+      const phase: PickemPhase = slate.phase ?? derivePickemPhase(slate.week);
       const seasonType = phase === "postseason" ? "postseason" : "regular";
       const res = await fetch(
         `/api/cfbd/fbs/week-games?year=${slate.season}&week=${slate.week}&seasonType=${seasonType}`,
@@ -210,6 +320,7 @@ function PickemSlatePageInner() {
 
   useEffect(() => {
     if (!slate) return;
+    if ((slate.entryMode ?? "auto") !== "auto") return;
     if (games.length > 0) return;
     refreshGames();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -217,6 +328,8 @@ function PickemSlatePageInner() {
 
   useEffect(() => {
     if (!slateId) return;
+    if (!hasSlate) return;
+    if (slateMode !== "college" || slateEntryMode !== "auto") return;
 
     let cancelled = false;
 
@@ -231,6 +344,7 @@ function PickemSlatePageInner() {
       setGames(latest.games ?? []);
       setPicks(latest.picks ?? {});
       setSuggestions(latest.suggestions ?? {});
+      setGameNotes({});
       setLocked(Boolean(latest.locked));
       setRecord(latest.record ?? { wins: 0, losses: 0, pushes: 0, pending: 0 });
     };
@@ -260,7 +374,7 @@ function PickemSlatePageInner() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [slateId]);
+  }, [slateId, hasSlate, slate?.id, slateMode, slateEntryMode]);
 
   useEffect(() => {
     if (!slate) return;
@@ -286,20 +400,22 @@ function PickemSlatePageInner() {
   async function runTgemForGame(g: SlateGame) {
     if (!slate) return;
 
-    const homeSlug = findSlugByTeamName(g.homeTeam);
-    const awaySlug = findSlugByTeamName(g.awayTeam);
-    if (!homeSlug || !awaySlug) {
+    const homeTeam = resolvePickemTeamIdentity(g.homeTeam);
+    const awayTeam = resolvePickemTeamIdentity(g.awayTeam);
+    if (!homeTeam.token || !awayTeam.token) {
+      const message = `TGEM synopsis unavailable: team mapping is incomplete for ${g.awayTeam ?? "TBD"} @ ${g.homeTeam ?? "TBD"}.`;
       setError(`Could not map team slug for ${g.awayTeam ?? "TBD"} @ ${g.homeTeam ?? "TBD"}.`);
+      setGameNotes((prev) => ({ ...prev, [g.id]: message }));
       return;
     }
 
     const venue = g.neutralSite ? "neutral" : "home";
-    const phase = derivePickemPhase(slate.week);
+    const phase: PickemPhase = slate.phase ?? derivePickemPhase(slate.week);
     const seasonType = phase === "postseason" ? "postseason" : "regular";
 
     const res = await fetch(
-      `/api/tgem/v11/matchup?team=${encodeURIComponent(homeSlug)}&opponent=${encodeURIComponent(
-        awaySlug,
+      `/api/tgem/v11/matchup?team=${encodeURIComponent(homeTeam.token)}&opponent=${encodeURIComponent(
+        awayTeam.token,
       )}&year=${encodeURIComponent(String(slate.season))}&venue=${venue}&phase=${phase}&week=${encodeURIComponent(
         String(slate.week),
       )}&seasonType=${seasonType}`,
@@ -312,17 +428,99 @@ function PickemSlatePageInner() {
 
     const lean = data?.lean ?? null;
     const suggestedPick: Exclude<PickChoice, null> = lean === "AWAY" ? "away" : "home";
-    const suggestion: GameSuggestion = {
+    const rawSuggestion: GameSuggestion = {
       pick: suggestedPick,
       confidence: typeof data?.confidence === "number" ? data.confidence : null,
       lean,
-      reasons: Array.isArray(data?.reasons) ? data.reasons.slice(0, 4) : [],
+      reasons: summarizeTgemReasonsFromApi(data, lean),
       updatedAt: new Date().toISOString(),
     };
+    let suggestion = rawSuggestion;
+
+    // Guardrail for clear subdivision mismatch games (FBS vs non-FBS).
+    let guardrailNote = "";
+    if (homeTeam.isFbs !== awayTeam.isFbs) {
+      const fbsPick: Exclude<PickChoice, null> = homeTeam.isFbs ? "home" : "away";
+      const nonFbsPick: Exclude<PickChoice, null> = homeTeam.isFbs ? "away" : "home";
+      const currentConfidence = rawSuggestion.confidence ?? 50;
+      const pickedNonFbs = rawSuggestion.pick === nonFbsPick;
+
+      if (pickedNonFbs && currentConfidence < 70) {
+        suggestion = {
+          ...rawSuggestion,
+          pick: fbsPick,
+          confidence: Math.max(72, currentConfidence),
+          reasons: [
+            "Subdivision gap guardrail: FBS roster depth and line play edge are prioritized in mismatch games.",
+            ...rawSuggestion.reasons,
+          ].slice(0, 8),
+        };
+        guardrailNote = "Guardrail applied: FBS vs non-FBS mismatch adjusted toward FBS side.";
+      } else if (!pickedNonFbs) {
+        suggestion = {
+          ...rawSuggestion,
+          confidence: Math.max(64, currentConfidence),
+        };
+        guardrailNote = "Guardrail context: FBS vs non-FBS mismatch confidence floor applied.";
+      }
+    }
+
+    // Guardrail for low-confidence FBS vs FBS mismatch at home.
+    if (homeTeam.isFbs && awayTeam.isFbs) {
+      const homeConf = FBS_CONFERENCE_BY_SLUG.get(homeTeam.token);
+      const awayConf = FBS_CONFERENCE_BY_SLUG.get(awayTeam.token);
+      const tierGap = conferenceTier(homeConf) - conferenceTier(awayConf);
+      const currentConfidence = suggestion.confidence ?? 50;
+      const isLowConfidence = currentConfidence < AUTO_PICK_CONFIDENCE_MIN;
+      const homeField = !g.neutralSite;
+
+      if (homeField && tierGap >= 2 && isLowConfidence) {
+        suggestion = {
+          ...suggestion,
+          pick: "home",
+          confidence: Math.max(68, currentConfidence),
+          reasons: [
+            "Program strength prior: home power-tier team vs lower-tier FBS opponent.",
+            ...suggestion.reasons,
+          ].slice(0, 8),
+        };
+        guardrailNote =
+          "Guardrail applied: low-confidence mismatch adjusted toward home power-tier side.";
+      }
+    }
+
+    const confidenceNum = suggestion.confidence ?? 0;
+    const shouldAutoPick = confidenceNum >= AUTO_PICK_CONFIDENCE_MIN;
 
     setSuggestions((prev) => ({ ...prev, [g.id]: suggestion }));
-    if (!locked) {
+    setGameNotes((prev) => ({ ...prev, [g.id]: guardrailNote }));
+    if (!locked && shouldAutoPick) {
       setPicks((prev) => ({ ...prev, [g.id]: suggestedPick }));
+    }
+    if (!shouldAutoPick) {
+      setGameNotes((prev) => ({
+        ...prev,
+        [g.id]: "Low-confidence lean: TGEM generated a read but did not auto-lock this pick (threshold: 60).",
+      }));
+    }
+  }
+
+  function setGameTgemError(g: SlateGame, message: string) {
+    setGameNotes((prev) => ({
+      ...prev,
+      [g.id]: `TGEM synopsis unavailable: ${message}`,
+    }));
+  }
+
+  async function suggestGame(g: SlateGame) {
+    try {
+      await runTgemForGame(g);
+      return true;
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "unknown TGEM error";
+      setGameTgemError(g, message);
+      setError(`TGEM failed for ${g.awayTeam ?? "TBD"} @ ${g.homeTeam ?? "TBD"}: ${message}`);
+      return false;
     }
   }
 
@@ -330,12 +528,15 @@ function PickemSlatePageInner() {
     if (games.length === 0) return;
     setBusy(true);
     setError(null);
+    let failed = 0;
     try {
       for (const g of games) {
-        await runTgemForGame(g);
+        const ok = await suggestGame(g);
+        if (!ok) failed += 1;
       }
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Unknown TGEM error");
+      if (failed > 0) {
+        setError(`TGEM finished with ${failed} game(s) missing a synopsis. See row notes for details.`);
+      }
     } finally {
       setBusy(false);
     }
@@ -348,6 +549,38 @@ function PickemSlatePageInner() {
   function gradeNow() {
     const r = gradeRecord(games, picks);
     setRecord(r);
+  }
+
+  function addManualGame() {
+    const away = manualAwayTeam.trim();
+    const home = manualHomeTeam.trim();
+    if (!away || !home) {
+      setError("Manual mode requires both away and home team names.");
+      return;
+    }
+
+    const game: SlateGame = {
+      id: `manual_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      startDate: manualStartDate ? new Date(manualStartDate).toISOString() : null,
+      homeTeam: home,
+      awayTeam: away,
+      venue: manualVenue.trim() || null,
+      neutralSite: manualNeutralSite,
+      completed: false,
+      homePoints: null,
+      awayPoints: null,
+    };
+
+    const nextGames = [...games, game];
+    const nextRecord = gradeRecord(nextGames, picks);
+    setGames(nextGames);
+    setRecord(nextRecord);
+    setManualAwayTeam("");
+    setManualHomeTeam("");
+    setManualStartDate("");
+    setManualVenue("");
+    setManualNeutralSite(false);
+    setError(null);
   }
 
   if (!slate) {
@@ -370,7 +603,9 @@ function PickemSlatePageInner() {
         <section className="rounded-xl bg-white p-5 shadow border border-gray-200 mb-5">
           <h1 className="text-2xl font-bold text-gray-900">{slate.slateName}</h1>
           <p className="text-sm text-gray-900 mt-1">
-            Season {slate.season} • Week {slate.week} • Mode: {slate.mode}
+            Season {slate.season} • Week {slate.week} • League: {slate.mode === "college" ? "College Football" : "NFL"}
+            {" • "}Setup: {(slate.entryMode ?? "auto") === "auto" ? "Auto" : "Manual"}
+            {" • "}Phase: {phaseToLabel(slatePhase)}
           </p>
           <p className="text-sm text-gray-900 mt-2">
             Picks made: <strong>{pickedCount}</strong> / {games.length}
@@ -383,6 +618,7 @@ function PickemSlatePageInner() {
             <button
               type="button"
               onClick={() => void refreshGames()}
+              disabled={(slate.entryMode ?? "auto") !== "auto"}
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
             >
               Refresh Games/Results
@@ -413,6 +649,56 @@ function PickemSlatePageInner() {
           </div>
           {error ? <p className="text-sm text-red-700 mt-3">{error}</p> : null}
         </section>
+
+        {(slate.entryMode ?? "auto") === "manual" ? (
+          <section className="rounded-xl bg-white p-5 shadow border border-gray-200 mb-5">
+            <h2 className="text-xl font-semibold text-gray-900 mb-3">Add Manual Matchup</h2>
+            <div className="grid gap-3 md:grid-cols-2">
+              <input
+                type="text"
+                value={manualAwayTeam}
+                onChange={(e) => setManualAwayTeam(e.target.value)}
+                placeholder="Away Team"
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+              <input
+                type="text"
+                value={manualHomeTeam}
+                onChange={(e) => setManualHomeTeam(e.target.value)}
+                placeholder="Home Team"
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+              <input
+                type="datetime-local"
+                value={manualStartDate}
+                onChange={(e) => setManualStartDate(e.target.value)}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+              <input
+                type="text"
+                value={manualVenue}
+                onChange={(e) => setManualVenue(e.target.value)}
+                placeholder="Venue (optional)"
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <label className="mt-3 flex items-center gap-2 text-sm text-gray-800">
+              <input
+                type="checkbox"
+                checked={manualNeutralSite}
+                onChange={(e) => setManualNeutralSite(e.target.checked)}
+              />
+              Neutral Site
+            </label>
+            <button
+              type="button"
+              onClick={addManualGame}
+              className="mt-3 rounded-lg bg-indigo-700 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-800"
+            >
+              Add Matchup
+            </button>
+          </section>
+        ) : null}
 
         <section className="rounded-xl bg-white p-5 shadow border border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900 mb-3">Games</h2>
@@ -456,15 +742,30 @@ function PickemSlatePageInner() {
                           <div className="flex flex-col gap-1">
                             <button
                               type="button"
-                              onClick={() => runTgemForGame(g)}
+                              onClick={() => void suggestGame(g)}
                               disabled={busy}
                               className="rounded border border-indigo-300 px-2 py-1 text-indigo-900 hover:bg-indigo-50 disabled:opacity-50"
                             >
                               Suggest
                             </button>
                             {suggestion ? (
+                              <>
+                                <span className="text-xs text-gray-700">
+                                  {typeof suggestion.confidence === "number" && suggestion.confidence < AUTO_PICK_CONFIDENCE_MIN
+                                    ? "TOSS-UP"
+                                    : suggestion.pick.toUpperCase()}{" "}
+                                  • Conf {suggestion.confidence ?? "N/A"}
+                                </span>
+                                <span className="text-xs text-gray-700">
+                                  {suggestion
+                                    ? buildCoachLeanSynopsis(suggestion, g, slatePhase)
+                                    : gameNotes[g.id] || "Coach read: no TGEM synopsis yet. Run Suggest to generate a lean."}
+                                </span>
+                              </>
+                            ) : null}
+                            {!suggestion ? (
                               <span className="text-xs text-gray-700">
-                                {suggestion.pick.toUpperCase()} • Conf {suggestion.confidence ?? "N/A"}
+                                {gameNotes[g.id] || "Coach read: no TGEM synopsis yet. Run Suggest to generate a lean."}
                               </span>
                             ) : null}
                           </div>

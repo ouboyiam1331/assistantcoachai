@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
@@ -6,6 +6,11 @@ import { useEffect, useMemo, useState } from "react";
 import AdSlot from "@/components/ui/AdSlot";
 import { LeadersBlock } from "@/components/team/LeadersBlock";
 import type { LeaderEntry } from "@/lib/cfbd/leaders";
+import {
+  allowPriorSeasonFallback as shouldAllowPriorSeasonFallback,
+  getScheduleSeasonYear,
+  getStatsSeasonYear,
+} from "@/lib/cfbd/season";
 import { resolveTeamColorProfile } from "@/lib/teamColors/colors";
 
 type ScheduleGame = {
@@ -64,12 +69,6 @@ type FcsMeta = {
 
 type SeasonTotals = Record<string, number>;
 type TGEMPhase = "regular" | "championship" | "postseason";
-
-function getCfbSeasonYearForDate(now = new Date()) {
-  const currentYear = now.getFullYear();
-  const month = now.getMonth(); // 0-based
-  return month >= 7 ? currentYear : currentYear - 1;
-}
 
 function fmt(n: number | null | undefined) {
   if (n === null || n === undefined) return "N/A";
@@ -533,9 +532,9 @@ export default function FcsTeamPage() {
   const search = useSearchParams();
   const slug = params?.team ?? "";
   const from = search.get("from");
-  const year = getCfbSeasonYearForDate();
-  const currentCalendarYear = new Date().getFullYear();
-  const allowPriorSeasonFallback = year >= currentCalendarYear;
+  const statsRequestYear = getStatsSeasonYear();
+  const scheduleRequestYear = getScheduleSeasonYear();
+  const allowPriorSeasonFallback = shouldAllowPriorSeasonFallback();
 
   const [meta, setMeta] = useState<FcsMeta>(null);
   const [schedule, setSchedule] = useState<ScheduleGame[]>([]);
@@ -543,11 +542,12 @@ export default function FcsTeamPage() {
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [seasonStats, setSeasonStats] = useState<SeasonStats | null>(null);
   const [seasonTotals, setSeasonTotals] = useState<SeasonTotals | null>(null);
-  const [seasonStatsYear, setSeasonStatsYear] = useState<number>(year);
+  const [seasonStatsYear, setSeasonStatsYear] = useState<number>(statsRequestYear);
   const [seasonStatsLoading, setSeasonStatsLoading] = useState(false);
   const [seasonStatsError, setSeasonStatsError] = useState<string | null>(null);
   const [leaders, setLeaders] = useState<LeaderEntry[] | null>(null);
-  const [leadersYear, setLeadersYear] = useState<number>(year);
+  const [leadersYear, setLeadersYear] = useState<number>(statsRequestYear);
+  const [scheduleSeasonYear, setScheduleSeasonYear] = useState<number>(scheduleRequestYear);
   const [leadersLoading, setLeadersLoading] = useState(false);
   const [leadersError, setLeadersError] = useState<string | null>(null);
   const teamName = meta?.name ?? slug;
@@ -557,7 +557,7 @@ export default function FcsTeamPage() {
     async function loadMeta() {
       if (!slug) return;
       try {
-        const res = await fetch(`/api/cfbd/fcs/team-meta/${slug}?year=${year}`);
+        const res = await fetch(`/api/cfbd/fcs/team-meta/${slug}?year=${scheduleRequestYear}`);
         const data = await res.json();
         if (!res.ok || data?.ok === false) return;
         if (!cancelled) setMeta((data?.meta ?? null) as FcsMeta);
@@ -569,7 +569,7 @@ export default function FcsTeamPage() {
     return () => {
       cancelled = true;
     };
-  }, [slug, year]);
+  }, [slug, scheduleRequestYear]);
 
   useEffect(() => {
     let cancelled = false;
@@ -591,10 +591,10 @@ export default function FcsTeamPage() {
       setLeadersLoading(true);
       setLeadersError(null);
       try {
-        let y = year;
+        let y = statsRequestYear;
         let out = await fetchFor(y);
         if (allowPriorSeasonFallback && out.availableCount === 0) {
-          y = year - 1;
+          y = statsRequestYear - 1;
           out = await fetchFor(y);
         }
         if (!cancelled) {
@@ -611,7 +611,7 @@ export default function FcsTeamPage() {
     return () => {
       cancelled = true;
     };
-  }, [slug, year, allowPriorSeasonFallback]);
+  }, [slug, statsRequestYear, allowPriorSeasonFallback]);
 
   useEffect(() => {
     let cancelled = false;
@@ -633,13 +633,13 @@ export default function FcsTeamPage() {
       setSeasonStatsLoading(true);
       setSeasonStatsError(null);
       try {
-        let y = year;
+        let y = statsRequestYear;
         let out = await fetchFor(y);
         if (
           allowPriorSeasonFallback &&
           (!out.normalized || out.normalized.games == null)
         ) {
-          y = year - 1;
+          y = statsRequestYear - 1;
           out = await fetchFor(y);
         }
         if (!cancelled) {
@@ -657,7 +657,7 @@ export default function FcsTeamPage() {
     return () => {
       cancelled = true;
     };
-  }, [slug, year, allowPriorSeasonFallback]);
+  }, [slug, statsRequestYear, allowPriorSeasonFallback]);
 
   useEffect(() => {
     let cancelled = false;
@@ -666,7 +666,7 @@ export default function FcsTeamPage() {
       setScheduleLoading(true);
       setScheduleError(null);
       try {
-        const res = await fetch(`/api/cfbd/fcs/schedule/${slug}?year=${year}`);
+        const res = await fetch(`/api/cfbd/fcs/schedule/${slug}?year=${scheduleRequestYear}`);
         const data = await res.json();
         if (!res.ok || data?.ok === false) {
           throw new Error(data?.error ?? `Schedule failed (${res.status})`);
@@ -680,7 +680,12 @@ export default function FcsTeamPage() {
           const wb = b.week ?? Number.POSITIVE_INFINITY;
           return wa - wb;
         });
-        if (!cancelled) setSchedule(games);
+        if (!cancelled) {
+          setSchedule(games);
+          const apiResolvedYear =
+            typeof data?.resolvedYear === "number" ? data.resolvedYear : null;
+          setScheduleSeasonYear(apiResolvedYear ?? scheduleRequestYear);
+        }
       } catch (e: unknown) {
         if (!cancelled) setScheduleError(e instanceof Error ? e.message : "Unknown error");
       } finally {
@@ -691,7 +696,7 @@ export default function FcsTeamPage() {
     return () => {
       cancelled = true;
     };
-  }, [slug, year]);
+  }, [slug, scheduleRequestYear]);
 
   const backHref = useMemo(() => {
     if (from === "by-conference") return "/team-analysis/fcs/by-conference";
@@ -1004,13 +1009,13 @@ export default function FcsTeamPage() {
           background: "#fff",
         }}
       >
-      <h2 style={{ margin: "0 0 10px 0", fontSize: 18 }}>Schedule ({year})</h2>
+      <h2 style={{ margin: "0 0 10px 0", fontSize: 18 }}>Schedule (Season {scheduleSeasonYear})</h2>
       {scheduleLoading ? (
         <div style={{ color: "#666" }}>Loading schedule...</div>
       ) : scheduleError ? (
         <div style={{ color: "#b00020" }}>Schedule error: {scheduleError}</div>
       ) : schedule.length === 0 ? (
-        <div style={{ color: "#666" }}>No games returned for {year}.</div>
+        <div style={{ color: "#666" }}>No games returned for season {scheduleSeasonYear}.</div>
       ) : (
         <div style={{ overflowX: "auto", border: "1px solid #eee", borderRadius: 12 }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -1073,9 +1078,15 @@ export default function FcsTeamPage() {
           </table>
         </div>
       )}
+      <div style={{ marginTop: 10, color: "#333", fontSize: 13 }}>
+        {scheduleSeasonYear === scheduleRequestYear
+          ? `Showing ${scheduleSeasonYear} schedule.`
+          : `Showing ${scheduleSeasonYear} schedule (fallback from requested ${scheduleRequestYear}).`}
+      </div>
       </section>
     </main>
   );
 }
+
 
 

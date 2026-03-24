@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { CfbdHttpError, cfbdGetJson, cfbdMockModeEnabled } from "@/lib/cfbd/http";
 import { findFcsTeamBySlug, resolveTeamFromParamsOrPath } from "@/lib/cfbd/fcs";
-import { getDefaultCfbSeasonYear } from "@/lib/cfbd/season";
+import { getScheduleSeasonYear } from "@/lib/cfbd/season";
 
 export async function GET(
   req: NextRequest,
@@ -11,7 +11,7 @@ export async function GET(
     const { team } = await ctx.params;
     const { searchParams } = new URL(req.url);
     const requestedYear =
-      searchParams.get("year") ?? String(getDefaultCfbSeasonYear());
+      searchParams.get("year") ?? String(getScheduleSeasonYear());
     const yearNum = Number(requestedYear);
 
     if (!Number.isFinite(yearNum) || yearNum < 1900) {

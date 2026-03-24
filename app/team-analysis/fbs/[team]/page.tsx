@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
@@ -10,6 +10,11 @@ import { FBS_TEAMS } from "@/data/fbsTeams";
 import type { TeamMeta } from "@/data/teamMeta";
 import { getTeamMeta } from "@/data/teamMeta";
 import type { LeaderEntry } from "@/lib/cfbd/leaders";
+import {
+  allowPriorSeasonFallback as shouldAllowPriorSeasonFallback,
+  getScheduleSeasonYear,
+  getStatsSeasonYear,
+} from "@/lib/cfbd/season";
 import { resolveTeamColorProfile } from "@/lib/teamColors/colors";
 
 type ScheduleGame = {
@@ -64,12 +69,6 @@ function classifySubdivision(conference: string) {
   if (conference === "Independents") return "FBS - Independent";
   if (conference === "Unknown Conference") return "Unknown";
   return "FBS - Group of Five";
-}
-
-function getCfbSeasonYearForDate(now = new Date()) {
-  const currentYear = now.getFullYear();
-  const month = now.getMonth(); // 0-based
-  return month >= 7 ? currentYear : currentYear - 1;
 }
 
 function fmt(n: number | null | undefined) {
@@ -712,18 +711,19 @@ export default function FbsTeamPage() {
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
 
-  const year = getCfbSeasonYearForDate();
-  const currentCalendarYear = new Date().getFullYear();
-  const allowPriorSeasonFallback = year >= currentCalendarYear;
+  const statsRequestYear = getStatsSeasonYear();
+  const scheduleRequestYear = getScheduleSeasonYear();
+  const allowPriorSeasonFallback = shouldAllowPriorSeasonFallback();
 
   // --- SEASON STATS (CFBD)
   const [seasonStats, setSeasonStats] = useState<SeasonStats | null>(null);
   const [seasonTotals, setSeasonTotals] = useState<SeasonTotals | null>(null);
-  const [seasonStatsYear, setSeasonStatsYear] = useState<number>(year);
+  const [seasonStatsYear, setSeasonStatsYear] = useState<number>(statsRequestYear);
   const [seasonStatsLoading, setSeasonStatsLoading] = useState(false);
   const [seasonStatsError, setSeasonStatsError] = useState<string | null>(null);
   const [leaders, setLeaders] = useState<LeaderEntry[] | null>(null);
-  const [leadersYear, setLeadersYear] = useState<number>(year);
+  const [leadersYear, setLeadersYear] = useState<number>(statsRequestYear);
+  const [scheduleSeasonYear, setScheduleSeasonYear] = useState<number>(scheduleRequestYear);
   const [leadersLoading, setLeadersLoading] = useState(false);
   const [leadersError, setLeadersError] = useState<string | null>(null);
 
@@ -734,7 +734,7 @@ export default function FbsTeamPage() {
       if (!slug) return;
 
       try {
-        const res = await fetch(`/api/cfbd/fbs/team-meta/${slug}?year=${year}`);
+        const res = await fetch(`/api/cfbd/fbs/team-meta/${slug}?year=${scheduleRequestYear}`);
         const data = await res.json();
         if (!res.ok || data?.ok === false) return;
 
@@ -749,7 +749,7 @@ export default function FbsTeamPage() {
     return () => {
       cancelled = true;
     };
-  }, [slug, year]);
+  }, [slug, scheduleRequestYear]);
 
   useEffect(() => {
     let cancelled = false;
@@ -776,7 +776,7 @@ export default function FbsTeamPage() {
 
       try {
         // Try current year first
-        let y = year;
+        let y = statsRequestYear;
         let out = await fetchFor(y);
 
         // If 2025 has no stats yet, fallback to 2024 automatically
@@ -784,7 +784,7 @@ export default function FbsTeamPage() {
           allowPriorSeasonFallback &&
           (!out.normalized || out.normalized.games == null)
         ) {
-          y = year - 1;
+          y = statsRequestYear - 1;
           out = await fetchFor(y);
         }
 
@@ -806,7 +806,7 @@ export default function FbsTeamPage() {
     return () => {
       cancelled = true;
     };
-  }, [slug, year, allowPriorSeasonFallback]);
+  }, [slug, statsRequestYear, allowPriorSeasonFallback]);
 
   useEffect(() => {
     let cancelled = false;
@@ -831,10 +831,10 @@ export default function FbsTeamPage() {
       setLeadersLoading(true);
       setLeadersError(null);
       try {
-        let y = year;
+        let y = statsRequestYear;
         let out = await fetchFor(y);
         if (allowPriorSeasonFallback && out.availableCount === 0) {
-          y = year - 1;
+          y = statsRequestYear - 1;
           out = await fetchFor(y);
         }
         if (!cancelled) {
@@ -854,7 +854,7 @@ export default function FbsTeamPage() {
     return () => {
       cancelled = true;
     };
-  }, [slug, year, allowPriorSeasonFallback]);
+  }, [slug, statsRequestYear, allowPriorSeasonFallback]);
 
   useEffect(() => {
     let cancelled = false;
@@ -866,7 +866,7 @@ export default function FbsTeamPage() {
       setScheduleError(null);
 
       try {
-        const res = await fetch(`/api/cfbd/fbs/schedule/${slug}?year=${year}`);
+        const res = await fetch(`/api/cfbd/fbs/schedule/${slug}?year=${scheduleRequestYear}`);
         const data = await res.json();
 
         if (!res.ok || data?.ok === false) {
@@ -896,7 +896,12 @@ export default function FbsTeamPage() {
           return wa - wb;
         });
 
-        if (!cancelled) setSchedule(games);
+        if (!cancelled) {
+          setSchedule(games);
+          const apiResolvedYear =
+            typeof data?.resolvedYear === "number" ? data.resolvedYear : null;
+          setScheduleSeasonYear(apiResolvedYear ?? scheduleRequestYear);
+        }
       } catch (e: unknown) {
         if (!cancelled) {
           setScheduleError(e instanceof Error ? e.message : "Unknown error");
@@ -910,7 +915,7 @@ export default function FbsTeamPage() {
     return () => {
       cancelled = true;
     };
-  }, [slug, year]);
+  }, [slug, scheduleRequestYear]);
 
   const location = mergedMeta?.location ?? null;
   const colorProfile = resolveTeamColorProfile({
@@ -1362,14 +1367,14 @@ export default function FbsTeamPage() {
         }}
       >
       {/* Schedule */}
-      <h2 style={{ margin: "0 0 10px 0", fontSize: 18 }}>Schedule ({year})</h2>
+      <h2 style={{ margin: "0 0 10px 0", fontSize: 18 }}>Schedule (Season {scheduleSeasonYear})</h2>
 
       {scheduleLoading ? (
         <div style={{ color: "#666" }}>Loading schedule...</div>
       ) : scheduleError ? (
         <div style={{ color: "#b00020" }}>Schedule error: {scheduleError}</div>
       ) : schedule.length === 0 ? (
-        <div style={{ color: "#666" }}>No games returned for {year}.</div>
+        <div style={{ color: "#666" }}>No games returned for season {scheduleSeasonYear}.</div>
       ) : (
         <div
           style={{
@@ -1525,10 +1530,16 @@ export default function FbsTeamPage() {
           </table>
         </div>
       )}
+      <div style={{ marginTop: 10, color: "#333", fontSize: 13 }}>
+        {scheduleSeasonYear === scheduleRequestYear
+          ? `Showing ${scheduleSeasonYear} schedule.`
+          : `Showing ${scheduleSeasonYear} schedule (fallback from requested ${scheduleRequestYear}).`}
+      </div>
       </section>
     </main>
   );
 }
+
 
 
 

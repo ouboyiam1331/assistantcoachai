@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { CfbdHttpError, cfbdGetJson } from "@/lib/cfbd/http";
-import { getDefaultCfbSeasonYear } from "@/lib/cfbd/season";
+import { getScheduleSeasonYear } from "@/lib/cfbd/season";
 import { resolveCfbdTeamName } from "@/lib/cfbd/teamName";
 
 type ScheduleAttempt = {
@@ -29,7 +29,7 @@ export async function GET(
     const { team } = await ctx.params;
     const { searchParams } = new URL(req.url);
     const requestedYear =
-      searchParams.get("year") ?? String(getDefaultCfbSeasonYear());
+      searchParams.get("year") ?? String(getScheduleSeasonYear());
 
     const teamSlug = getTeamFromParamsOrPath(req, team);
 

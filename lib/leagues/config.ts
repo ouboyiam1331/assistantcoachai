@@ -3,6 +3,7 @@ export enum LeagueKey {
   FCS = "FCS",
   NFL = "NFL",
   NCAAMB = "NCAAMB",
+  NCAAWB = "NCAAWB",
   NBA = "NBA",
   MLB = "MLB",
 }
@@ -108,6 +109,25 @@ export const leagueConfig: Record<LeagueKey, LeagueConfig> = {
       bracketology: true,
     },
   },
+  [LeagueKey.NCAAWB]: {
+    key: LeagueKey.NCAAWB,
+    label: "NCAA Women's Basketball",
+    enabled: false,
+    comingSoon: true,
+    dataProvider: "basketball",
+    seasonRules: {
+      unitLabel: "round",
+      postseasonTypes: ["regular", "conference-tournament", "march-madness"],
+    },
+    routes: {
+      teamAnalysis: true,
+      matchupAnalysis: true,
+      pickem: true,
+      archive: true,
+      aiAssistant: true,
+      bracketology: true,
+    },
+  },
   [LeagueKey.NBA]: {
     key: LeagueKey.NBA,
     label: "NBA",
@@ -154,4 +174,3 @@ export function getLeagueConfig(key: LeagueKey) {
 
 export const allLeagues = Object.values(leagueConfig);
 export const enabledLeagues = allLeagues.filter((l) => l.enabled);
-
