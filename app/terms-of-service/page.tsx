@@ -46,9 +46,18 @@ export default function TermsOfServicePage() {
         <div className="space-y-2">
           <h2 className="text-lg font-semibold">Intellectual Property</h2>
           <p>
-            The TGEM model outputs, branding, and site content are protected by
-            applicable intellectual property laws. Do not copy, resell, or redistribute
-            protected content without permission.
+            The TGEM model, its methodology, model documentation, source code logic,
+            outputs, branding, and site content are proprietary to TGEM Sports and are
+            protected by applicable intellectual property laws. No part of the site or
+            TGEM outputs may be copied, reproduced, republished, scraped, sold,
+            licensed, distributed, reverse engineered, or used to create derivative
+            works without prior written permission from TGEM Sports.
+          </p>
+          <p>
+            Limited personal, non-commercial use of the service is permitted, but that
+            permission does not transfer any ownership rights in the TGEM model or its
+            outputs. Unauthorized reproduction or commercial use of TGEM content is
+            prohibited.
           </p>
         </div>
 
