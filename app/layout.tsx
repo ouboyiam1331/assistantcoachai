@@ -30,6 +30,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <meta
+          name="google-site-verification"
+          content="gMdTZ3IScxqoU32cCT7cpwFP1JUVj3UrZvD1ZcJgrss"
+        />
         <script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5009402663425957"
