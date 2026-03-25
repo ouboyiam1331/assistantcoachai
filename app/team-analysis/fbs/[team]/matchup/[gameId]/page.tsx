@@ -92,8 +92,13 @@ function normalizeTeamName(s: string) {
     .trim();
 }
 
+const FBS_TEAM_BY_SLUG = new Map(FBS_TEAMS.map((team) => [team.slug, team]));
+const FBS_SLUG_BY_NORMALIZED_NAME = new Map(
+  FBS_TEAMS.map((team) => [normalizeTeamName(team.name), team.slug]),
+);
+
 function findTeamBySlug(slug: string) {
-  return FBS_TEAMS.find((t) => t.slug === slug) ?? null;
+  return FBS_TEAM_BY_SLUG.get(slug) ?? null;
 }
 
 function findSlugByTeamName(teamNameRaw: string | null | undefined) {
@@ -101,8 +106,8 @@ function findSlugByTeamName(teamNameRaw: string | null | undefined) {
 
   const target = normalizeTeamName(teamNameRaw);
 
-  const exact = FBS_TEAMS.find((t) => normalizeTeamName(t.name) === target);
-  if (exact) return exact.slug;
+  const exact = FBS_SLUG_BY_NORMALIZED_NAME.get(target);
+  if (exact) return exact;
 
   const loose = FBS_TEAMS.find((t) => {
     const n = normalizeTeamName(t.name);
@@ -323,28 +328,31 @@ export default function MatchupPage() {
     return month === 0 || month === 1 ? y - 1 : y;
   }, [game?.season, game?.startDate]);
 
-  // Load game
   useEffect(() => {
     let cancelled = false;
 
-    async function loadGame() {
+    async function loadMatchupPayload() {
       setErr(null);
+      setTgemErr(null);
       setGame(null);
+      setTgem(null);
 
       try {
         if (!gameId) throw new Error("Missing gameId");
 
-        const res = await fetch(
-          `/api/cfbd/game/${encodeURIComponent(gameId)}`,
-          {
-            cache: "no-store",
-          },
-        );
+        const params = new URLSearchParams();
+        params.set("team", teamSlug);
+        if (opponentFromQuery) params.set("opponent", opponentFromQuery);
+        if (phaseOverride !== "auto") params.set("phaseOverride", phaseOverride);
+
+        const res = await fetch(`/api/analysis/fbs/game/${encodeURIComponent(gameId)}?${params.toString()}`, {
+          cache: "no-store",
+        });
 
         const data = await res.json();
 
         if (!res.ok || data?.ok === false) {
-          throw new Error(data?.error ?? "Game fetch failed");
+          throw new Error(data?.error ?? "Matchup fetch failed");
         }
 
         const rawGame = data?.game ?? null;
@@ -352,17 +360,25 @@ export default function MatchupPage() {
 
         const found = normalizeCfbdGame(rawGame);
 
-        if (!cancelled) setGame(found);
+        if (!cancelled) {
+          setGame(found);
+          setTgem((data?.tgem as TGEMResult | null) ?? null);
+          if (!data?.tgem) {
+            setTgemErr("Matchup analysis unavailable.");
+          }
+        }
       } catch (e: unknown) {
-        if (!cancelled) setErr(e instanceof Error ? e.message : "Unknown error");
+        if (!cancelled) {
+          setErr(e instanceof Error ? e.message : "Unknown error");
+        }
       }
     }
 
-    loadGame();
+    loadMatchupPayload();
     return () => {
       cancelled = true;
     };
-  }, [gameId]);
+  }, [gameId, teamSlug, opponentFromQuery, phaseOverride]);
 
   // Resolve opponent
   const opponentSlug = useMemo(() => {
@@ -389,62 +405,6 @@ export default function MatchupPage() {
 
     return findSlugByTeamName(opponentName);
   }, [opponentFromQuery, game?.homeTeam, game?.awayTeam, teamSlug]);
-
-  // Run TGEM via API
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadTGEM() {
-      setTgem(null);
-      setTgemErr(null);
-
-      try {
-        if (!teamSlug) throw new Error("Missing team param");
-        if (!opponentSlug) throw new Error("Opponent not resolved yet");
-
-        let venue: "home" | "away" | "neutral" | undefined = undefined;
-
-        if (game?.neutralSite) {
-          venue = "neutral";
-        } else if (game?.homeTeam && game?.awayTeam) {
-          const teamObj = findTeamBySlug(teamSlug);
-          const teamName = (teamObj?.name ?? teamSlug).toLowerCase();
-          const home = game.homeTeam.toLowerCase();
-          const away = game.awayTeam.toLowerCase();
-
-          if (home.includes(teamName)) venue = "home";
-          else if (away.includes(teamName)) venue = "away";
-        }
-
-        const res = await fetch(
-          `/api/tgem/v11/matchup?team=${encodeURIComponent(teamSlug)}&opponent=${encodeURIComponent(
-            opponentSlug,
-          )}&year=${encodeURIComponent(String(seasonYear))}${venue ? `&venue=${venue}` : ""}${
-            game?.seasonType ? `&seasonType=${encodeURIComponent(String(game.seasonType))}` : ""
-          }${typeof game?.week === "number" ? `&week=${encodeURIComponent(String(game.week))}` : ""}&phase=${encodeURIComponent(
-            effectivePhase,
-          )}`,
-          { cache: "no-store" },
-        );
-
-        const data = await res.json();
-
-        if (!res.ok || data?.ok === false) {
-          throw new Error(data?.error ?? "TGEM failed");
-        }
-
-        if (!cancelled) setTgem(data);
-      } catch (e: unknown) {
-        if (!cancelled) setTgemErr(e instanceof Error ? e.message : "Unknown error");
-      }
-    }
-
-    if (game) loadTGEM();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [teamSlug, opponentSlug, seasonYear, game, effectivePhase]);
 
   const title = useMemo(() => {
     if (!game?.homeTeam || !game?.awayTeam) return "Matchup Analysis";

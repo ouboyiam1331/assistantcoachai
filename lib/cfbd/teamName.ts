@@ -32,6 +32,14 @@ const CFBD_TEAM_ALIASES: Record<string, string> = {
   hawaii: "Hawai'i",
 };
 
+const FBS_TEAM_BY_SLUG = new Map(
+  FBS_TEAMS.map((team) => [team.slug.toLowerCase(), team.name]),
+);
+
+const FBS_TEAM_BY_NAME = new Map(
+  FBS_TEAMS.map((team) => [team.name.toLowerCase(), team.name]),
+);
+
 export function resolveCfbdTeamName(teamSlugOrName: string) {
   const raw = String(teamSlugOrName || "").trim();
   if (!raw) return "";
@@ -40,11 +48,11 @@ export function resolveCfbdTeamName(teamSlugOrName: string) {
 
   if (CFBD_TEAM_ALIASES[key]) return CFBD_TEAM_ALIASES[key];
 
-  const fromSlug = FBS_TEAMS.find((t) => t.slug.toLowerCase() === key);
-  if (fromSlug) return fromSlug.name;
+  const fromSlug = FBS_TEAM_BY_SLUG.get(key);
+  if (fromSlug) return fromSlug;
 
-  const fromName = FBS_TEAMS.find((t) => t.name.toLowerCase() === key);
-  if (fromName) return fromName.name;
+  const fromName = FBS_TEAM_BY_NAME.get(key);
+  if (fromName) return fromName;
 
   // If caller already passed something like "Miami (OH)", keep it
   if (raw.includes("(") && raw.includes(")")) return raw;

@@ -319,14 +319,6 @@ function PickemSlatePageInner() {
   }
 
   useEffect(() => {
-    if (!slate) return;
-    if ((slate.entryMode ?? "auto") !== "auto") return;
-    if (games.length > 0) return;
-    refreshGames();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slate?.id]);
-
-  useEffect(() => {
     if (!slateId) return;
     if (!hasSlate) return;
     if (slateMode !== "college" || slateEntryMode !== "auto") return;
@@ -525,15 +517,143 @@ function PickemSlatePageInner() {
   }
 
   async function runTgemAll() {
-    if (games.length === 0) return;
+    if (!slate || games.length === 0) return;
     setBusy(true);
     setError(null);
-    let failed = 0;
     try {
-      for (const g of games) {
-        const ok = await suggestGame(g);
-        if (!ok) failed += 1;
+      const res = await fetch("/api/pickem/fbs/tgem-batch", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          season: slate.season,
+          week: slate.week,
+          phase: slatePhase,
+          games: games.map((g) => ({
+            id: g.id,
+            homeTeam: g.homeTeam,
+            awayTeam: g.awayTeam,
+            neutralSite: g.neutralSite,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data?.ok === false) {
+        throw new Error(data?.error ?? `TGEM batch failed (${res.status})`);
       }
+
+      const results = new Map<string, Record<string, unknown>>();
+      for (const entry of Array.isArray(data?.results) ? data.results : []) {
+        const row = entry as Record<string, unknown>;
+        const gameId = String(row.gameId ?? "");
+        if (gameId) results.set(gameId, row);
+      }
+
+      let failed = 0;
+      for (const g of games) {
+        const result = results.get(g.id);
+        if (!result || result.ok !== true) {
+          failed += 1;
+          setGameTgemError(
+            g,
+            String(result?.error ?? "No batch result was returned."),
+          );
+          continue;
+        }
+
+        const lean = String(result.lean ?? "");
+        const suggestedPick: Exclude<PickChoice, null> =
+          lean === "AWAY" ? "away" : "home";
+        const rawSuggestion: GameSuggestion = {
+          pick: suggestedPick,
+          confidence:
+            typeof result.confidence === "number" ? result.confidence : null,
+          lean,
+          reasons: Array.isArray(result.reasons)
+            ? result.reasons
+                .map((reason) => String(reason ?? "").trim())
+                .filter((reason) => reason.length > 0)
+                .slice(0, 8)
+            : [],
+          updatedAt: new Date().toISOString(),
+        };
+        let suggestion = rawSuggestion;
+        let guardrailNote = "";
+
+        const homeToken = String(result.homeToken ?? "");
+        const awayToken = String(result.awayToken ?? "");
+        const homeIsFbs = Boolean(result.homeIsFbs);
+        const awayIsFbs = Boolean(result.awayIsFbs);
+
+        if (homeIsFbs !== awayIsFbs) {
+          const fbsPick: Exclude<PickChoice, null> = homeIsFbs ? "home" : "away";
+          const nonFbsPick: Exclude<PickChoice, null> = homeIsFbs ? "away" : "home";
+          const currentConfidence = rawSuggestion.confidence ?? 50;
+          const pickedNonFbs = rawSuggestion.pick === nonFbsPick;
+
+          if (pickedNonFbs && currentConfidence < 70) {
+            suggestion = {
+              ...rawSuggestion,
+              pick: fbsPick,
+              confidence: Math.max(72, currentConfidence),
+              reasons: [
+                "Subdivision gap guardrail: FBS roster depth and line play edge are prioritized in mismatch games.",
+                ...rawSuggestion.reasons,
+              ].slice(0, 8),
+            };
+            guardrailNote =
+              "Guardrail applied: FBS vs non-FBS mismatch adjusted toward FBS side.";
+          } else if (!pickedNonFbs) {
+            suggestion = {
+              ...rawSuggestion,
+              confidence: Math.max(64, currentConfidence),
+            };
+            guardrailNote =
+              "Guardrail context: FBS vs non-FBS mismatch confidence floor applied.";
+          }
+        }
+
+        if (homeIsFbs && awayIsFbs) {
+          const homeConf = FBS_CONFERENCE_BY_SLUG.get(homeToken);
+          const awayConf = FBS_CONFERENCE_BY_SLUG.get(awayToken);
+          const tierGap = conferenceTier(homeConf) - conferenceTier(awayConf);
+          const currentConfidence = suggestion.confidence ?? 50;
+          const isLowConfidence = currentConfidence < AUTO_PICK_CONFIDENCE_MIN;
+          const homeField = !g.neutralSite;
+
+          if (homeField && tierGap >= 2 && isLowConfidence) {
+            suggestion = {
+              ...suggestion,
+              pick: "home",
+              confidence: Math.max(68, currentConfidence),
+              reasons: [
+                "Program strength prior: home power-tier team vs lower-tier FBS opponent.",
+                ...suggestion.reasons,
+              ].slice(0, 8),
+            };
+            guardrailNote =
+              "Guardrail applied: low-confidence mismatch adjusted toward home power-tier side.";
+          }
+        }
+
+        const confidenceNum = suggestion.confidence ?? 0;
+        const shouldAutoPick = confidenceNum >= AUTO_PICK_CONFIDENCE_MIN;
+
+        setSuggestions((prev) => ({ ...prev, [g.id]: suggestion }));
+        setGameNotes((prev) => ({
+          ...prev,
+          [g.id]:
+            guardrailNote ||
+            (shouldAutoPick
+              ? ""
+              : "Low-confidence lean: TGEM generated a read but did not auto-lock this pick (threshold: 60)."),
+        }));
+        if (!locked && shouldAutoPick) {
+          setPicks((prev) => ({ ...prev, [g.id]: suggestion.pick }));
+        }
+      }
+
       if (failed > 0) {
         setError(`TGEM finished with ${failed} game(s) missing a synopsis. See row notes for details.`);
       }

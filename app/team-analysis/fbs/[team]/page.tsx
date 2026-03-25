@@ -544,103 +544,6 @@ function buildCoachNarrative(
   };
 }
 
-// Tries to normalize whatever the API returns into our SeasonStats shape.
-// This keeps us safe even if CFBD fields change or the API returns a slightly different format.
-function normalizeSeasonStats(payload: unknown): SeasonStats | null {
-  const data = payload as Record<string, unknown> | null;
-  const src = data?.stats ?? data?.data ?? data ?? null;
-  if (!src) return null;
-
-  // Some endpoints return arrays (one row). Handle that.
-  const row = Array.isArray(src) ? src[0] : src;
-
-  // If nothing meaningful exists, bail.
-  if (!row || typeof row !== "object") return null;
-
-  // Try multiple likely keys. We keep this defensive.
-  const games = row.games ?? row.gp ?? row.totalGames ?? null;
-
-  const pointsPerGame =
-    row.pointsPerGame ??
-    row.offense?.pointsPerGame ??
-    row.offense?.ppg ??
-    row.ppg ??
-    null;
-
-  const yardsPerGame =
-    row.yardsPerGame ??
-    row.offense?.yardsPerGame ??
-    row.offense?.ypg ??
-    row.ypg ??
-    null;
-
-  const passYardsPerGame =
-    row.passYardsPerGame ??
-    row.offense?.passYardsPerGame ??
-    row.offense?.passYpg ??
-    row.passYpg ??
-    null;
-
-  const rushYardsPerGame =
-    row.rushYardsPerGame ??
-    row.offense?.rushYardsPerGame ??
-    row.offense?.rushYpg ??
-    row.rushYpg ??
-    null;
-
-  const pointsAllowedPerGame =
-    row.pointsAllowedPerGame ??
-    row.defense?.pointsAllowedPerGame ??
-    row.defense?.ppgAllowed ??
-    row.ppgAllowed ??
-    null;
-
-  const yardsAllowedPerGame =
-    row.yardsAllowedPerGame ??
-    row.defense?.yardsAllowedPerGame ??
-    row.defense?.ypgAllowed ??
-    row.ypgAllowed ??
-    null;
-
-  const thirdDownPct =
-    row.thirdDownPct ??
-    row.situational?.thirdDownPct ??
-    row.thirdDownConversionPct ??
-    null;
-
-  const redZonePct =
-    row.redZonePct ??
-    row.situational?.redZonePct ??
-    row.redZoneScoringPct ??
-    null;
-
-  const penaltiesPerGame =
-    row.penaltiesPerGame ?? row.discipline?.penaltiesPerGame ?? null;
-
-  const penaltyYardsPerGame =
-    row.penaltyYardsPerGame ?? row.discipline?.penaltyYardsPerGame ?? null;
-
-  const turnoverMarginPerGame =
-    row.turnoverMarginPerGame ??
-    row.ballSecurity?.turnoverMarginPerGame ??
-    null;
-
-  return {
-    games: games ?? null,
-    pointsPerGame: pointsPerGame ?? null,
-    yardsPerGame: yardsPerGame ?? null,
-    passYardsPerGame: passYardsPerGame ?? null,
-    rushYardsPerGame: rushYardsPerGame ?? null,
-    pointsAllowedPerGame: pointsAllowedPerGame ?? null,
-    yardsAllowedPerGame: yardsAllowedPerGame ?? null,
-    thirdDownPct: thirdDownPct ?? null,
-    redZonePct: redZonePct ?? null,
-    penaltiesPerGame: penaltiesPerGame ?? null,
-    penaltyYardsPerGame: penaltyYardsPerGame ?? null,
-    turnoverMarginPerGame: turnoverMarginPerGame ?? null,
-  };
-}
-
 function normalizeTeamName(s: string) {
   return s
     .toLowerCase()
@@ -713,7 +616,7 @@ export default function FbsTeamPage() {
 
   const statsRequestYear = getStatsSeasonYear();
   const scheduleRequestYear = getScheduleSeasonYear();
-  const allowPriorSeasonFallback = shouldAllowPriorSeasonFallback();
+  shouldAllowPriorSeasonFallback();
 
   // --- SEASON STATS (CFBD)
   const [seasonStats, setSeasonStats] = useState<SeasonStats | null>(null);
@@ -730,192 +633,87 @@ export default function FbsTeamPage() {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadMeta() {
-      if (!slug) return;
-
-      try {
-        const res = await fetch(`/api/cfbd/fbs/team-meta/${slug}?year=${scheduleRequestYear}`);
-        const data = await res.json();
-        if (!res.ok || data?.ok === false) return;
-
-        const nextMeta = (data?.meta ?? null) as TeamMeta | null;
-        if (!cancelled) setApiMeta(nextMeta);
-      } catch {
-        if (!cancelled) setApiMeta(null);
-      }
-    }
-
-    loadMeta();
-    return () => {
-      cancelled = true;
-    };
-  }, [slug, scheduleRequestYear]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchFor(y: number) {
-      const res = await fetch(`/api/cfbd/fbs/season-stats/${slug}?year=${y}`);
-      const data = await res.json();
-      if (!res.ok || data?.ok === false) {
-        throw new Error(data?.error || `Season stats failed (${res.status})`);
-      }
-      const normalized = normalizeSeasonStats(data);
-      const totals =
-        data?.seasonTotals && typeof data.seasonTotals === "object"
-          ? (data.seasonTotals as SeasonTotals)
-          : null;
-      return { normalized, totals, raw: data };
-    }
-
-    async function load() {
+    async function loadTeamPayload() {
       if (!slug) return;
 
       setSeasonStatsLoading(true);
-      setSeasonStatsError(null);
-
-      try {
-        // Try current year first
-        let y = statsRequestYear;
-        let out = await fetchFor(y);
-
-        // If 2025 has no stats yet, fallback to 2024 automatically
-        if (
-          allowPriorSeasonFallback &&
-          (!out.normalized || out.normalized.games == null)
-        ) {
-          y = statsRequestYear - 1;
-          out = await fetchFor(y);
-        }
-
-        if (!cancelled) {
-          setSeasonStatsYear(y);
-          setSeasonStats(out.normalized);
-          setSeasonTotals(out.totals);
-        }
-      } catch (e: unknown) {
-        if (!cancelled) {
-          setSeasonStatsError(e instanceof Error ? e.message : "Unknown error");
-        }
-      } finally {
-        if (!cancelled) setSeasonStatsLoading(false);
-      }
-    }
-
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [slug, statsRequestYear, allowPriorSeasonFallback]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchFor(y: number) {
-      const res = await fetch(`/api/cfbd/fbs/leaders/${slug}?year=${y}`);
-      const data = await res.json();
-      if (!res.ok || data?.ok === false) {
-        throw new Error(data?.error || `Leaders request failed (${res.status})`);
-      }
-      const list = Array.isArray(data?.leaders) ? (data.leaders as LeaderEntry[]) : [];
-      const availableCount =
-        typeof data?.availableCount === "number"
-          ? data.availableCount
-          : list.filter((l) => l.player && l.stat != null).length;
-      return { list, availableCount };
-    }
-
-    async function load() {
-      if (!slug) return;
-
       setLeadersLoading(true);
-      setLeadersError(null);
-      try {
-        let y = statsRequestYear;
-        let out = await fetchFor(y);
-        if (allowPriorSeasonFallback && out.availableCount === 0) {
-          y = statsRequestYear - 1;
-          out = await fetchFor(y);
-        }
-        if (!cancelled) {
-          setLeadersYear(y);
-          setLeaders(out.list);
-        }
-      } catch (e: unknown) {
-        if (!cancelled) {
-          setLeadersError(e instanceof Error ? e.message : "Unknown error");
-        }
-      } finally {
-        if (!cancelled) setLeadersLoading(false);
-      }
-    }
-
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [slug, statsRequestYear, allowPriorSeasonFallback]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      if (!slug) return;
-
       setScheduleLoading(true);
+      setSeasonStatsError(null);
+      setLeadersError(null);
       setScheduleError(null);
 
       try {
-        const res = await fetch(`/api/cfbd/fbs/schedule/${slug}?year=${scheduleRequestYear}`);
+        const res = await fetch(
+          `/api/analysis/fbs/team/${slug}?statsYear=${statsRequestYear}&scheduleYear=${scheduleRequestYear}`,
+          { cache: "no-store" },
+        );
         const data = await res.json();
-
         if (!res.ok || data?.ok === false) {
-          const msg =
-            data?.error ||
-            data?.message ||
-            `Schedule request failed (${res.status})`;
-          throw new Error(msg);
+          throw new Error(data?.error ?? `Team payload request failed (${res.status})`);
         }
 
-        const games: ScheduleGame[] = Array.isArray(data?.games)
-          ? data.games
-          : Array.isArray(data)
-            ? data
-            : [];
-
-        // sort by date first, then week
+        const games: ScheduleGame[] = Array.isArray(data?.schedule) ? data.schedule : [];
         games.sort((a, b) => {
-          const da =
-            parseDate(a.startDate)?.getTime() ?? Number.POSITIVE_INFINITY;
-          const db =
-            parseDate(b.startDate)?.getTime() ?? Number.POSITIVE_INFINITY;
+          const da = parseDate(a.startDate)?.getTime() ?? Number.POSITIVE_INFINITY;
+          const db = parseDate(b.startDate)?.getTime() ?? Number.POSITIVE_INFINITY;
           if (da !== db) return da - db;
-
           const wa = a.week ?? Number.POSITIVE_INFINITY;
           const wb = b.week ?? Number.POSITIVE_INFINITY;
           return wa - wb;
         });
 
         if (!cancelled) {
+          setApiMeta((data?.meta ?? null) as TeamMeta | null);
+          setSeasonStats((data?.seasonStats ?? null) as SeasonStats | null);
+          setSeasonTotals(
+            data?.seasonTotals && typeof data.seasonTotals === "object"
+              ? (data.seasonTotals as SeasonTotals)
+              : null,
+          );
+          setSeasonStatsYear(
+            typeof data?.seasonStatsYear === "number" ? data.seasonStatsYear : statsRequestYear,
+          );
+          setSeasonStatsError((data?.seasonStatsError as string | null) ?? null);
+          setLeaders(Array.isArray(data?.leaders) ? (data.leaders as LeaderEntry[]) : null);
+          setLeadersYear(
+            typeof data?.leadersYear === "number" ? data.leadersYear : statsRequestYear,
+          );
+          setLeadersError((data?.leadersError as string | null) ?? null);
           setSchedule(games);
-          const apiResolvedYear =
-            typeof data?.resolvedYear === "number" ? data.resolvedYear : null;
-          setScheduleSeasonYear(apiResolvedYear ?? scheduleRequestYear);
+          setScheduleSeasonYear(
+            typeof data?.scheduleSeasonYear === "number"
+              ? data.scheduleSeasonYear
+              : scheduleRequestYear,
+          );
+          setScheduleError((data?.scheduleError as string | null) ?? null);
         }
       } catch (e: unknown) {
         if (!cancelled) {
-          setScheduleError(e instanceof Error ? e.message : "Unknown error");
+          const message = e instanceof Error ? e.message : "Unknown error";
+          setApiMeta(null);
+          setSeasonStats(null);
+          setSeasonTotals(null);
+          setLeaders(null);
+          setSchedule([]);
+          setSeasonStatsError(message);
+          setLeadersError(message);
+          setScheduleError(message);
         }
       } finally {
-        if (!cancelled) setScheduleLoading(false);
+        if (!cancelled) {
+          setSeasonStatsLoading(false);
+          setLeadersLoading(false);
+          setScheduleLoading(false);
+        }
       }
     }
 
-    load();
+    loadTeamPayload();
     return () => {
       cancelled = true;
     };
-  }, [slug, scheduleRequestYear]);
+  }, [slug, statsRequestYear, scheduleRequestYear]);
 
   const location = mergedMeta?.location ?? null;
   const colorProfile = resolveTeamColorProfile({

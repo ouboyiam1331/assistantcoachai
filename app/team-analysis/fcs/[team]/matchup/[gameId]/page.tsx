@@ -301,67 +301,41 @@ export default function FcsMatchupPage() {
 
   useEffect(() => {
     let cancelled = false;
-    async function loadGame() {
+    async function loadMatchupPayload() {
       setErr(null);
+      setTgemErr(null);
       setGame(null);
+      setTgem(null);
       try {
         if (!gameId) throw new Error("Missing gameId");
-        const res = await fetch(`/api/cfbd/game/${encodeURIComponent(gameId)}`, { cache: "no-store" });
+        const params = new URLSearchParams();
+        params.set("team", teamName);
+        if (opponentFromQuery) params.set("opponent", opponentFromQuery);
+        if (phaseOverride !== "auto") params.set("phaseOverride", phaseOverride);
+
+        const res = await fetch(`/api/analysis/fcs/game/${encodeURIComponent(gameId)}?${params.toString()}`, {
+          cache: "no-store",
+        });
         const data = await res.json();
-        if (!res.ok || data?.ok === false) throw new Error(data?.error ?? "Game fetch failed");
+        if (!res.ok || data?.ok === false) throw new Error(data?.error ?? "Matchup fetch failed");
         const rawGame = data?.game as Record<string, unknown> | null;
         if (!rawGame) throw new Error("Game not found.");
-        if (!cancelled) setGame(normalizeCfbdGame(rawGame));
+        if (!cancelled) {
+          setGame(normalizeCfbdGame(rawGame));
+          setTgem((data?.tgem as TGEMResult | null) ?? null);
+          if (!data?.tgem) {
+            setTgemErr("Matchup analysis unavailable.");
+          }
+        }
       } catch (e: unknown) {
         if (!cancelled) setErr(e instanceof Error ? e.message : "Unknown error");
       }
     }
-    loadGame();
+    loadMatchupPayload();
     return () => {
       cancelled = true;
     };
-  }, [gameId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadTGEM() {
-      setTgem(null);
-      setTgemErr(null);
-      try {
-        if (!teamName) throw new Error("Missing team");
-        if (!opponentName) throw new Error("Opponent not resolved yet");
-        let venue: "home" | "away" | "neutral" | undefined = undefined;
-        if (game?.neutralSite) venue = "neutral";
-        else if (game?.homeTeam && game?.awayTeam) {
-          const teamNorm = normalizeTeamName(teamName);
-          const homeNorm = normalizeTeamName(game.homeTeam);
-          const awayNorm = normalizeTeamName(game.awayTeam);
-          if (homeNorm.includes(teamNorm) || teamNorm.includes(homeNorm)) venue = "home";
-          else if (awayNorm.includes(teamNorm) || teamNorm.includes(awayNorm)) venue = "away";
-        }
-
-        const res = await fetch(
-          `/api/tgem/v11/matchup?team=${encodeURIComponent(teamName)}&opponent=${encodeURIComponent(
-            opponentName,
-          )}&year=${encodeURIComponent(String(seasonYear))}${venue ? `&venue=${venue}` : ""}${
-            game?.seasonType ? `&seasonType=${encodeURIComponent(String(game.seasonType))}` : ""
-          }${typeof game?.week === "number" ? `&week=${encodeURIComponent(String(game.week))}` : ""}&phase=${encodeURIComponent(
-            effectivePhase,
-          )}`,
-          { cache: "no-store" },
-        );
-        const data = await res.json();
-        if (!res.ok || data?.ok === false) throw new Error(data?.error ?? "TGEM failed");
-        if (!cancelled) setTgem(data as TGEMResult);
-      } catch (e: unknown) {
-        if (!cancelled) setTgemErr(e instanceof Error ? e.message : "Unknown error");
-      }
-    }
-    if (game) loadTGEM();
-    return () => {
-      cancelled = true;
-    };
-  }, [game, teamName, opponentName, seasonYear, effectivePhase]);
+  }, [gameId, teamName, opponentFromQuery, phaseOverride]);
 
   const title = useMemo(() => {
     if (!game?.homeTeam || !game?.awayTeam) return "Matchup Analysis";

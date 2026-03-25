@@ -63,6 +63,12 @@ const KEY = "assistantcoachai_pickem_slates_v3";
 const LAST_SYNC_KEY = "assistantcoachai_pickem_last_sync_ms_v1";
 const MIN_SYNC_GAP_MS = 90_000;
 const AUTO_SYNC_MS = 300_000;
+let syncInFlight: Promise<{
+  checked: number;
+  updated: number;
+  errors: string[];
+  skipped: boolean;
+}> | null = null;
 
 function canUseStorage() {
   return typeof window !== "undefined" && !!window.localStorage;
@@ -373,6 +379,11 @@ async function fetchWeekGames(
 }
 
 export async function syncFbsSlatesFromApi(options?: { force?: boolean }) {
+  if (syncInFlight) {
+    return syncInFlight;
+  }
+
+  const run = async () => {
   if (!canUseStorage()) {
     return { checked: 0, updated: 0, errors: [] as string[], skipped: true };
   }
@@ -443,6 +454,14 @@ export async function syncFbsSlatesFromApi(options?: { force?: boolean }) {
 
   window.localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
   return { checked, updated, errors, skipped: false };
+  };
+
+  syncInFlight = run();
+  try {
+    return await syncInFlight;
+  } finally {
+    syncInFlight = null;
+  }
 }
 
 export { AUTO_SYNC_MS };
