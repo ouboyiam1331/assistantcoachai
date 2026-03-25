@@ -9,12 +9,25 @@ function fmt(n: number | null | undefined) {
 
 type Props = {
   seasonYear: number;
+  note?: string | null;
+  emptyMessage?: string;
   loading: boolean;
   error: string | null;
   leaders: LeaderEntry[] | null;
 };
 
-export function LeadersBlock({ seasonYear, loading, error, leaders }: Props) {
+export function LeadersBlock({
+  seasonYear,
+  note,
+  emptyMessage = "No key player data available.",
+  loading,
+  error,
+  leaders,
+}: Props) {
+  const availableLeaders = (leaders ?? []).filter(
+    (entry) => entry.player && entry.stat != null,
+  );
+
   return (
     <section
       style={{
@@ -28,11 +41,14 @@ export function LeadersBlock({ seasonYear, loading, error, leaders }: Props) {
       <div style={{ fontWeight: 800, marginBottom: 8, color: "#111" }}>
         Key Players / Leaders ({seasonYear})
       </div>
+      {note ? (
+        <div style={{ marginBottom: 8, color: "#333", fontSize: 13 }}>{note}</div>
+      ) : null}
 
       {loading ? <div style={{ color: "#333" }}>Loading leaders...</div> : null}
       {!loading && error ? <div style={{ color: "#b00020" }}>Leaders error: {error}</div> : null}
 
-      {!loading && !error ? (
+      {!loading && !error && availableLeaders.length > 0 ? (
         <div
           style={{
             display: "grid",
@@ -41,7 +57,7 @@ export function LeadersBlock({ seasonYear, loading, error, leaders }: Props) {
             color: "#111",
           }}
         >
-          {(leaders ?? []).map((entry) => (
+          {availableLeaders.map((entry) => (
             <div key={entry.key}>
               <strong>{entry.label}:</strong>{" "}
               {entry.player && entry.stat != null
@@ -51,7 +67,10 @@ export function LeadersBlock({ seasonYear, loading, error, leaders }: Props) {
           ))}
         </div>
       ) : null}
+
+      {!loading && !error && availableLeaders.length === 0 ? (
+        <div style={{ color: "#333" }}>{emptyMessage}</div>
+      ) : null}
     </section>
   );
 }
-

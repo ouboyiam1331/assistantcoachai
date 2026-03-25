@@ -117,6 +117,17 @@ function fmtPct(n: number | null | undefined, digits = 1) {
   return `${n.toFixed(digits)}%`;
 }
 
+function buildSeasonDataNote(requestedYear: number, resolvedYear: number) {
+  if (resolvedYear < requestedYear) {
+    return `Showing previous season data (${resolvedYear}) until ${requestedYear} results are available.`;
+  }
+  return null;
+}
+
+function buildPendingSeasonMessage(seasonYear: number) {
+  return `${seasonYear} information will fill in after the first games are completed.`;
+}
+
 function prettyStatName(key: string) {
   return key
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
@@ -723,6 +734,18 @@ export default function FbsTeamPage() {
     secondary: mergedMeta?.alt_color ?? null,
   });
   const fourthDownPct = getFourthDownPct(seasonTotals);
+  const seasonStatsNote = buildSeasonDataNote(statsRequestYear, seasonStatsYear);
+  const leadersNote = buildSeasonDataNote(statsRequestYear, leadersYear);
+  const showPendingSeasonStatsMessage =
+    !seasonStatsLoading &&
+    !seasonStatsError &&
+    seasonStatsYear === statsRequestYear &&
+    (!seasonStats || (seasonStats.games ?? 0) === 0);
+  const showPendingLeadersMessage =
+    !leadersLoading &&
+    !leadersError &&
+    leadersYear === statsRequestYear &&
+    !(leaders ?? []).some((entry) => entry.player && entry.stat != null);
   const tgemPhase = useMemo(() => classifyTeamTgemPhase(schedule), [schedule]);
   const tgemTeamAnalysis = useMemo(
     () => buildTgemTeamAnalysis(seasonStats, seasonTotals, fourthDownPct, tgemPhase),
@@ -1040,12 +1063,21 @@ export default function FbsTeamPage() {
         <div style={{ fontWeight: 800, marginBottom: 8, color: "#111" }}>
           Season Stats ({seasonStatsYear})
         </div>
+        {seasonStatsNote ? (
+          <div style={{ marginBottom: 8, color: "#333", fontSize: 13 }}>
+            {seasonStatsNote}
+          </div>
+        ) : null}
 
         {seasonStatsLoading ? (
           <div style={{ color: "#333" }}>Loading season stats...</div>
         ) : seasonStatsError ? (
           <div style={{ color: "#b00020" }}>
             Season stats error: {seasonStatsError}
+          </div>
+        ) : showPendingSeasonStatsMessage ? (
+          <div style={{ color: "#333" }}>
+            {buildPendingSeasonMessage(seasonStatsYear)}
           </div>
         ) : !seasonStats ? (
           <div style={{ color: "#333" }}>No season stats available.</div>
@@ -1139,13 +1171,20 @@ export default function FbsTeamPage() {
           </div>
         ) : null}
 
-        <div style={{ marginTop: 10, color: "#333", fontSize: 13 }}>
-          Note: If the current season is not available yet, TGEM Sports
-          automatically falls back to the previous season.
-        </div>
+        {!seasonStatsNote && !showPendingSeasonStatsMessage ? (
+          <div style={{ marginTop: 10, color: "#333", fontSize: 13 }}>
+            Showing {seasonStatsYear} season stats.
+          </div>
+        ) : null}
       </section>
       <LeadersBlock
         seasonYear={leadersYear}
+        note={leadersNote}
+        emptyMessage={
+          showPendingLeadersMessage
+            ? buildPendingSeasonMessage(leadersYear)
+            : "No key player data available."
+        }
         loading={leadersLoading}
         error={leadersError}
         leaders={leaders}

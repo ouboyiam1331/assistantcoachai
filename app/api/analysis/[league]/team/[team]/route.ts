@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { LeagueKey } from "@/lib/leagues/config";
 import { getSnapshot, setSnapshot, snapshotTtlMs } from "@/lib/snapshots/store";
+import { allowPriorSeasonFallback } from "@/lib/cfbd/season";
 import { GET as getFbsTeamMeta } from "@/app/api/cfbd/fbs/team-meta/[team]/route";
 import { GET as getFbsSeasonStats } from "@/app/api/cfbd/fbs/season-stats/[team]/route";
 import { GET as getFbsLeaders } from "@/app/api/cfbd/fbs/leaders/[team]/route";
@@ -134,7 +135,7 @@ export async function GET(
             ).length
           : 0;
 
-    if (leadersAvailableCount === 0) {
+    if (leadersAvailableCount === 0 && allowPriorSeasonFallback()) {
       try {
         leadersPayload = await invokeRouteJson<Record<string, unknown>>(
           req,

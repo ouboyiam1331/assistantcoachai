@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import TgemDisclaimer from "@/components/ui/TgemDisclaimer";
 
 import { FBS_TEAMS } from "@/data/fbsTeams";
 
@@ -616,7 +617,8 @@ export default function MatchupPage() {
 
           <hr style={{ margin: "18px 0" }} />
 
-	          <h2 style={{ marginBottom: 10 }}>TGEM v11 Analysis</h2>
+          <h2 style={{ marginBottom: 10 }}>TGEM v11 Analysis</h2>
+          <TgemDisclaimer />
           <div style={{ marginBottom: 10, display: "flex", gap: 10, alignItems: "center" }}>
             <label htmlFor="phaseOverride" style={{ fontWeight: 600 }}>
               TGEM Phase:

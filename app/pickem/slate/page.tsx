@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
+import TgemDisclaimer from "@/components/ui/TgemDisclaimer";
 import { FBS_TEAMS } from "@/data/fbsTeams";
 import {
   AUTO_SYNC_MS,
@@ -767,6 +768,7 @@ function PickemSlatePageInner() {
               Grade Picks
             </button>
           </div>
+          <TgemDisclaimer compact />
           {error ? <p className="text-sm text-red-700 mt-3">{error}</p> : null}
         </section>
 

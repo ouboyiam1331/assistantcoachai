@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import TgemDisclaimer from "@/components/ui/TgemDisclaimer";
 import {
   AUTO_SYNC_MS,
   listSlates,
@@ -238,6 +239,9 @@ export default function PickemHomePage() {
             Build weekly pick&apos;em slates, let TGEM suggest winners and confidence
             levels, then track how you perform over the season.
           </p>
+          <div className="mx-auto mt-4 max-w-3xl">
+            <TgemDisclaimer />
+          </div>
         </header>
 
         <div className="grid gap-6 md:grid-cols-2">
