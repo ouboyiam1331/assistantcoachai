@@ -49,3 +49,24 @@ export function getSnapshotStats() {
   };
 }
 
+export function listSnapshots(prefixes?: string[]) {
+  const now = Date.now();
+  const normalizedPrefixes = Array.isArray(prefixes)
+    ? prefixes.filter((prefix) => prefix.length > 0)
+    : null;
+  const rows: Array<SnapshotRecord<unknown>> = [];
+
+  for (const row of snapshotStore.values()) {
+    if (row.expiresAt <= now) continue;
+    if (
+      normalizedPrefixes &&
+      !normalizedPrefixes.some((prefix) => row.key.startsWith(prefix))
+    ) {
+      continue;
+    }
+    rows.push(row);
+  }
+
+  rows.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  return rows;
+}

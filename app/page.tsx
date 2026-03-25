@@ -1,8 +1,28 @@
-﻿"use client";
-
+import type { Metadata } from "next";
 import Link from "next/link";
+import { getHomepageSummary } from "@/lib/homepage/summary";
 
-export default function Home() {
+export async function generateMetadata(): Promise<Metadata> {
+  const summary = getHomepageSummary();
+
+  return {
+    title: "TGEM Sports | College Football Picks & Analytics",
+    description: summary.seoDescription,
+    keywords: [
+      "college football picks",
+      "pick'em predictions",
+      "sports analytics",
+      "football predictions",
+      "college football analysis",
+      "TGEM Sports",
+      "matchup insights",
+    ],
+  };
+}
+
+export default async function Home() {
+  const summary = getHomepageSummary();
+
   return (
     <main className="min-h-screen bg-gray-100 px-6 py-12 text-gray-900">
       <div className="mx-auto flex w-full max-w-5xl flex-col items-center">
@@ -17,9 +37,7 @@ export default function Home() {
           </p>
 
           <p className="mt-3 mx-auto max-w-2xl text-lg leading-relaxed text-gray-900">
-            Advanced college football analytics, matchup projections, and
-            confidence-weighted insights for college football, with other sports
-            coming soon.
+            {summary.heroBlurb}
           </p>
 
           <div className="mt-10 flex flex-col gap-6 sm:flex-row sm:justify-center">
@@ -41,23 +59,30 @@ export default function Home() {
 
         <section className="mt-10 grid w-full gap-8 lg:grid-cols-[1.5fr_1fr]">
           <div className="rounded-3xl bg-white px-8 py-10 shadow-sm">
-            <h2 className="text-2xl font-bold text-gray-900">
-              College Football Pick&apos;em Predictions &amp; Analysis
-            </h2>
+            <h2 className="text-2xl font-bold text-gray-900">{summary.seoHeading}</h2>
             <p className="mt-4 max-w-3xl text-base leading-8 text-gray-700">
-              TGEM Sports provides advanced college football predictions, matchup
-              analysis, and weekly pick&apos;em insights powered by the Tactical Game
-              Evaluation Model (TGEM). Analyze team performance, compare matchups,
-              and gain an edge in your pick&apos;em leagues.
+              {summary.seoDescription}
             </p>
           </div>
 
           <aside className="rounded-3xl bg-white px-8 py-10 shadow-sm">
             <h2 className="text-2xl font-bold text-gray-900">Latest TGEM Insights</h2>
-            <ul className="mt-5 space-y-3 text-base text-gray-700">
-              <li>Week 1 Pick&apos;em Predictions</li>
-              <li>Top 5 Matchups This Week</li>
-              <li>Upset Alert:</li>
+            <p className="mt-3 text-lg font-semibold text-gray-900">
+              Early reads are coming into focus
+            </p>
+            <p className="mt-2 leading-7 text-gray-700">
+              TGEM is tracking matchup edges, team strengths, and key indicators to
+              give you a clear read on the week ahead.
+            </p>
+            <ul className="mt-5 space-y-4 text-base text-gray-700">
+              {summary.insights.map((insight) => (
+                <li key={insight.title}>
+                  <Link href={insight.href} className="font-semibold text-gray-900 hover:underline">
+                    {insight.title}
+                  </Link>
+                  <p className="mt-1 leading-7 text-gray-700">{insight.detail}</p>
+                </li>
+              ))}
             </ul>
           </aside>
         </section>
