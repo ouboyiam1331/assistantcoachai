@@ -57,7 +57,7 @@ export default function Home() {
             <ul className="mt-5 space-y-3 text-base text-gray-700">
               <li>Week 1 Pick&apos;em Predictions</li>
               <li>Top 5 Matchups This Week</li>
-              <li>Upset Alert: Troy vs UAB</li>
+              <li>Upset Alert:</li>
             </ul>
           </aside>
         </section>
