@@ -18,10 +18,12 @@
 
 html {
   color-scheme: light;
+  background-color: #ffffff;
 }
 
 body {
   background: var(--background);
+  background-color: #ffffff;
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
 }
@@ -37,13 +39,30 @@ button {
   max-width: 1080px;
   margin: 0 auto;
   padding: 20px;
+  color: #111827;
+  background-color: transparent;
 }
 
 .tgem-card {
   border: 1px solid var(--tgem-border);
   border-radius: 12px;
   background: linear-gradient(180deg, #fff 0%, #fcfdff 100%);
+  color: #111827;
   box-shadow: 0 1px 2px rgb(16 24 40 / 5%);
+}
+
+.tgem-shell table,
+.tgem-shell th,
+.tgem-shell td,
+.tgem-shell p,
+.tgem-shell li,
+.tgem-shell div,
+.tgem-shell span,
+.tgem-shell strong,
+.tgem-shell h1,
+.tgem-shell h2,
+.tgem-shell h3 {
+  color: inherit;
 }
 
 .tgem-back-link {

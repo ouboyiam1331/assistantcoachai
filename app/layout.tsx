@@ -39,6 +39,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <meta name="color-scheme" content="light" />
+        <meta name="theme-color" content="#ffffff" />
         <meta
           name="google-site-verification"
           content="gMdTZ3IScxqoU32cCT7cpwFP1JUVj3UrZvD1ZcJgrss"
