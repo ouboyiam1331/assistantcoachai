@@ -18,7 +18,8 @@ export default function Home() {
 
           <p className="mt-3 mx-auto max-w-2xl text-lg leading-relaxed text-gray-900">
             Advanced college football analytics, matchup projections, and
-            confidence-weighted insights for FBS &amp; FCS.
+            confidence-weighted insights for college football, with other sports
+            coming soon.
           </p>
 
           <div className="mt-10 flex flex-col gap-6 sm:flex-row sm:justify-center">
