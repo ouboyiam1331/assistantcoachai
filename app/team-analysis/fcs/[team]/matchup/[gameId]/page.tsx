@@ -367,6 +367,16 @@ export default function FcsMatchupPage() {
     if (!game?.homeTeam || !game?.awayTeam) return "Matchup Analysis";
     return `${game.awayTeam} @ ${game.homeTeam}`;
   }, [game]);
+  const seoHeading = useMemo(() => {
+    if (!game?.homeTeam || !game?.awayTeam) return "College Football Prediction & Analysis";
+    return `${game.homeTeam} vs ${game.awayTeam} Prediction & Analysis`;
+  }, [game]);
+  const seoDescription = useMemo(() => {
+    if (!game?.homeTeam || !game?.awayTeam) {
+      return "TGEM matchup breakdown with key stats, matchup advantages, and model-based prediction.";
+    }
+    return `TGEM breakdown of ${game.homeTeam} vs ${game.awayTeam}, including key stats, matchup advantages, and model-based prediction.`;
+  }, [game]);
 
   const status = useMemo(() => {
     if (!game) return "TBD";
@@ -460,7 +470,10 @@ export default function FcsMatchupPage() {
       <div style={{ marginBottom: 14 }}>
       </div>
 
-      <h1 style={{ marginTop: 0 }}>Matchup Analysis</h1>
+      <h1 style={{ marginTop: 0, marginBottom: 8 }}>{seoHeading}</h1>
+      <p style={{ marginTop: 0, marginBottom: 16, maxWidth: 820, color: "#444", lineHeight: 1.6 }}>
+        {seoDescription}
+      </p>
       {err ? <div style={{ color: "#b00020" }}>{err}</div> : null}
 
       {!game ? (
