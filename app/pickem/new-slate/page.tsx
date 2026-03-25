@@ -1,25 +1,29 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   createSlate,
   type PickemEntryMode,
   type PickemMode,
-  type PickemPhase,
 } from "@/lib/pickem/storage";
 import { LeagueKey, leagueConfig } from "@/lib/leagues/config";
+import { getCurrentCollegePickemContext } from "@/lib/pickem/currentContext";
+
+function phaseLabel(phase: "regular" | "championship" | "postseason") {
+  if (phase === "postseason") return "Bowl / CFP / Postseason";
+  if (phase === "championship") return "Championship";
+  return "Regular Season";
+}
 
 export default function NewSlatePage() {
   const router = useRouter();
+  const currentContext = useMemo(() => getCurrentCollegePickemContext(), []);
   const [slateName, setSlateName] = useState("");
-  const [season, setSeason] = useState(2025);
-  const [weekNumber, setWeekNumber] = useState<number | "">("");
   const [weekOrRound, setWeekOrRound] = useState("");
   const [mode, setMode] = useState<PickemMode>("college");
   const [entryMode, setEntryMode] = useState<PickemEntryMode>("auto");
-  const [phase, setPhase] = useState<PickemPhase>("regular");
 
   const modeLeague: Record<typeof mode, LeagueKey> = {
     college: LeagueKey.FBS,
@@ -29,15 +33,14 @@ export default function NewSlatePage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const week = Number(weekNumber);
     const slate = createSlate({
       slateName,
-      season,
-      week,
-      weekOrRound: weekOrRound || String(week),
+      season: currentContext.season,
+      week: currentContext.week,
+      weekOrRound: weekOrRound || currentContext.weekOrRound,
       mode,
       entryMode,
-      phase,
+      phase: currentContext.phase,
       league: modeLeague[mode],
       createdBy: "local-dev",
     });
@@ -52,86 +55,65 @@ export default function NewSlatePage() {
         </Link>
       </div>
 
-      <section className="max-w-3xl mx-auto rounded-xl bg-white p-6 shadow border border-gray-200">
-        <h1 className="text-2xl font-bold mb-2 text-gray-900">Create a New Pick&apos;em Slate</h1>
-        <p className="text-sm text-gray-900 mb-6 leading-relaxed">
-          Define the basics for this slate. In later steps, you&apos;ll add games and
-          let TGEM analyze each matchup.
+      <section className="mx-auto max-w-3xl rounded-xl border border-gray-200 bg-white p-6 shadow">
+        <h1 className="mb-2 text-2xl font-bold text-gray-900">Create a New Pick&apos;em Slate</h1>
+        <p className="mb-6 text-sm leading-relaxed text-gray-900">
+          Define the basics for this slate. Season, week, and phase are set
+          automatically to the current college football slate context.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">Slate Name</label>
+            <label className="mb-1 block text-sm font-medium text-gray-900">Slate Name</label>
             <input
               type="text"
               value={slateName}
               onChange={(e) => setSlateName(e.target.value)}
-              placeholder='e.g., "Week 1 - Opening Weekend"'
-              className="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-700"
+              placeholder={`e.g., "Week ${currentContext.week} - TGEM Board"`}
+              className="w-full rounded-lg border border-gray-400 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-700"
               required
             />
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">Season (Year)</label>
-              <input
-                type="number"
-                value={season}
-                onChange={(e) => setSeason(Number(e.target.value))}
-                className="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-700"
-                min={2000}
-                max={2100}
-              />
+              <label className="mb-1 block text-sm font-medium text-gray-900">Season (Auto)</label>
+              <div className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900">
+                {currentContext.season}
+              </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">Week Number</label>
-              <input
-                type="number"
-                value={weekNumber}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setWeekNumber(val === "" ? "" : Number(val));
-                }}
-                className="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-700"
-                min={1}
-                max={30}
-                placeholder="e.g., 1, 2, 3..."
-                required
-              />
+              <label className="mb-1 block text-sm font-medium text-gray-900">Week (Auto)</label>
+              <div className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900">
+                Week {currentContext.week}
+              </div>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">Week or Round Label</label>
+            <label className="mb-1 block text-sm font-medium text-gray-900">Week or Round Label</label>
             <input
               type="text"
               value={weekOrRound}
               onChange={(e) => setWeekOrRound(e.target.value)}
-              className="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-700"
-              placeholder="e.g., Week 1, Conference Championship, Round of 64"
+              className="w-full rounded-lg border border-gray-400 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-700"
+              placeholder={`Default: Week ${currentContext.week}`}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">TGEM Phase</label>
-            <select
-              value={phase}
-              onChange={(e) => setPhase(e.target.value as PickemPhase)}
-              className="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-700"
-            >
-              <option value="regular">Regular Season</option>
-              <option value="championship">Championship</option>
-              <option value="postseason">Bowl / CFP / Postseason</option>
-            </select>
+            <label className="mb-2 block text-sm font-medium text-gray-900">TGEM Phase (Auto)</label>
+            <div className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900">
+              {phaseLabel(currentContext.phase)}
+            </div>
             <p className="mt-2 text-xs text-gray-700">
-              TGEM applies phase-specific weighting from your selected phase.
+              TGEM phase is derived automatically from the current week.
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">League</label>
+            <label className="mb-2 block text-sm font-medium text-gray-900">League</label>
             <div className="grid gap-3 md:grid-cols-2">
               <button
                 type="button"
@@ -147,9 +129,7 @@ export default function NewSlatePage() {
               <button
                 type="button"
                 disabled
-                className={`rounded-lg border px-3 py-2 text-sm ${
-                  "border-gray-300 text-gray-500 bg-gray-100 cursor-not-allowed"
-                }`}
+                className="cursor-not-allowed rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-500"
               >
                 {leagueConfig.NFL.label} (Coming Soon)
               </button>
@@ -157,7 +137,7 @@ export default function NewSlatePage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">Slate Setup</label>
+            <label className="mb-2 block text-sm font-medium text-gray-900">Slate Setup</label>
             <div className="grid gap-3 md:grid-cols-2">
               <button
                 type="button"
@@ -184,23 +164,22 @@ export default function NewSlatePage() {
             </div>
             <p className="mt-2 text-xs text-gray-700">
               {entryMode === "auto"
-                ? "Auto loads the full week slate."
+                ? "Auto loads the full current-week slate."
                 : "Manual lets you add only the matchups you want."}
             </p>
           </div>
 
-          <div className="pt-2 flex gap-3 items-center">
+          <div className="flex items-center gap-3 pt-2">
             <button
               type="submit"
               className="rounded-lg bg-emerald-700 px-6 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
             >
               Continue to Slate
             </button>
-            <p className="text-xs text-gray-900">Next: load week games and start making picks.</p>
+            <p className="text-xs text-gray-900">Next: load the current week and start making picks.</p>
           </div>
         </form>
       </section>
     </main>
   );
 }
-
