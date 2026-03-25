@@ -15,8 +15,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TGEM Sports",
-  description: "Powered by the Tactical Game Evaluation Model",
+  title: "TGEM Sports | College Football Picks & Analytics",
+  description:
+    "TGEM Sports delivers advanced college football predictions, matchup analysis, and pick'em insights powered by the Tactical Game Evaluation Model.",
+  keywords: [
+    "college football picks",
+    "pick'em predictions",
+    "sports analytics",
+    "football predictions",
+    "college football analysis",
+    "TGEM Sports",
+  ],
   other: {
     "google-adsense-account": "ca-pub-5009402663425957",
   },
