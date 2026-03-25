@@ -25,6 +25,33 @@ export default function TeamAnalysisHomePage() {
         <p className="mt-2 text-gray-900">Choose a path below to begin.</p>
       </header>
 
+      <section className="max-w-4xl mx-auto mb-8 rounded-2xl border border-red-200 bg-gradient-to-r from-red-700 to-red-600 p-6 text-white shadow-lg">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl">
+            <h2 className="text-2xl font-bold">College football is live now</h2>
+            <p className="mt-2 text-sm leading-7 text-red-50">
+              FBS and FCS are the active TGEM paths today. Dive into team dashboards,
+              compare schedules, and open matchup analysis to see where the strongest
+              edges are starting to show up.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/team-analysis/fbs"
+              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+            >
+              Explore FBS
+            </Link>
+            <Link
+              href="/team-analysis/fcs"
+              className="rounded-lg border border-white/60 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10"
+            >
+              Explore FCS
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <section className="max-w-4xl mx-auto grid gap-6 md:grid-cols-2">
         {analysisLeagues.map((league) => {
           const href =

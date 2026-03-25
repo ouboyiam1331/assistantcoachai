@@ -772,6 +772,38 @@ export default function MatchupPage() {
               ) : null}
 	            </div>
 	          )}
+          <div
+            style={{
+              marginTop: 16,
+              border: "1px solid #d7e7db",
+              borderRadius: 12,
+              padding: 16,
+              background: "#f4fbf6",
+            }}
+          >
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6, color: "#123b22" }}>
+              Ready to turn this lean into a live board?
+            </div>
+            <p style={{ margin: "0 0 12px 0", color: "#2b4b35", lineHeight: 1.6 }}>
+              Open Pick&apos;em Mode to build a slate, compare TGEM reads across games,
+              and make your own picks. You can always go against the lean if your read
+              says the spot is different.
+            </p>
+            <Link
+              href="/pickem"
+              style={{
+                display: "inline-block",
+                borderRadius: 10,
+                background: "#15803d",
+                color: "#fff",
+                fontWeight: 700,
+                padding: "10px 14px",
+                textDecoration: "none",
+              }}
+            >
+              Open Pick&apos;em Mode
+            </Link>
+          </div>
           <div style={{ marginTop: 14 }}>
           </div>
 	        </>
