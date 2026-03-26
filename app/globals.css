@@ -3,10 +3,29 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --tgem-page-top: #f3f4f6;
   --tgem-surface: #ffffff;
+  --tgem-surface-subtle: #f8fafc;
+  --tgem-surface-hover: #f3f4f6;
   --tgem-border: #e4e7ec;
   --tgem-muted: #475467;
+  --tgem-muted-strong: #344054;
   --tgem-accent: #0f4c5c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #030712;
+    --foreground: #f3f4f6;
+    --tgem-page-top: #0b1220;
+    --tgem-surface: #111827;
+    --tgem-surface-subtle: #0b1220;
+    --tgem-surface-hover: #1f2937;
+    --tgem-border: #1f2937;
+    --tgem-muted: #9ca3af;
+    --tgem-muted-strong: #d1d5db;
+    --tgem-accent: #93c5fd;
+  }
 }
 
 @theme inline {
@@ -17,13 +36,13 @@
 }
 
 html {
-  color-scheme: light;
-  background-color: #ffffff;
+  color-scheme: light dark;
+  background-color: var(--background);
 }
 
 body {
   background: var(--background);
-  background-color: #ffffff;
+  background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
 }
@@ -32,7 +51,7 @@ input,
 select,
 textarea,
 button {
-  color-scheme: light;
+  color-scheme: light dark;
 }
 
 .tgem-shell {
@@ -40,14 +59,17 @@ button {
   margin: 0 auto;
   padding: 20px;
   color: #111827;
-  background-color: transparent;
+  background: linear-gradient(180deg, var(--tgem-page-top) 0%, var(--background) 100%);
+  background-color: var(--background);
+  color: var(--foreground);
+  min-height: 100vh;
 }
 
 .tgem-card {
   border: 1px solid var(--tgem-border);
   border-radius: 12px;
-  background: linear-gradient(180deg, #fff 0%, #fcfdff 100%);
-  color: #111827;
+  background: var(--tgem-surface);
+  color: var(--foreground);
   box-shadow: 0 1px 2px rgb(16 24 40 / 5%);
 }
 
@@ -74,11 +96,11 @@ button {
   border-radius: 8px;
   color: var(--tgem-accent);
   text-decoration: none;
-  background: #fff;
+  background: var(--tgem-surface);
 }
 
 .tgem-back-link:hover {
-  background: #f8fafc;
+  background: var(--tgem-surface-hover);
 }
 
 .tgem-label-muted {
@@ -112,4 +134,230 @@ button {
   position: relative;
   top: -0.15em;
   letter-spacing: 0;
+}
+
+.tgem-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, var(--tgem-page-top) 0%, var(--background) 100%);
+  color: var(--foreground);
+}
+
+.tgem-surface {
+  border: 1px solid var(--tgem-border);
+  border-radius: 1.5rem;
+  background: var(--tgem-surface);
+  box-shadow: 0 1px 2px rgb(16 24 40 / 6%);
+}
+
+.tgem-surface-subtle {
+  border: 1px solid var(--tgem-border);
+  border-radius: 1rem;
+  background: var(--tgem-surface-subtle);
+}
+
+.tgem-button-secondary {
+  border: 1px solid var(--tgem-border);
+  background: var(--tgem-surface);
+  color: var(--foreground);
+}
+
+.tgem-button-secondary:hover {
+  background: var(--tgem-surface-hover);
+}
+
+.tgem-input {
+  border: 1px solid var(--tgem-border);
+  background: var(--tgem-surface);
+  color: var(--foreground);
+}
+
+.tgem-input::placeholder {
+  color: var(--tgem-muted);
+}
+
+.tgem-muted {
+  color: var(--tgem-muted);
+}
+
+.tgem-cta-warm {
+  border: 1px solid #fecaca;
+  border-radius: 1.5rem;
+  background: linear-gradient(90deg, #b91c1c 0%, #dc2626 100%);
+  color: #fff;
+  box-shadow: 0 10px 30px rgb(127 29 29 / 12%);
+}
+
+.tgem-cta-warm-copy {
+  color: #fee2e2;
+}
+
+.tgem-cta-warm-button {
+  background: #fff;
+  color: #b91c1c;
+}
+
+.tgem-cta-warm-button:hover {
+  background: #fef2f2;
+}
+
+.tgem-cta-success {
+  border: 1px solid #86efac;
+  border-radius: 0.75rem;
+  background: linear-gradient(180deg, #ecfdf3 0%, #dcfce7 100%);
+  color: #14532d;
+  box-shadow: 0 8px 24px rgb(20 83 45 / 8%);
+}
+
+.tgem-cta-success-copy {
+  color: #166534;
+}
+
+.tgem-cta-success-button {
+  background: #15803d;
+  color: #fff;
+}
+
+.tgem-cta-success-button:hover {
+  background: #166534;
+}
+
+@media (prefers-color-scheme: dark) {
+  .tgem-cta-warm {
+    border-color: rgb(127 29 29 / 0.45);
+    background: linear-gradient(90deg, #3f1216 0%, #4b161b 100%);
+    color: #f9fafb;
+    box-shadow: 0 10px 24px rgb(0 0 0 / 22%);
+  }
+
+  .tgem-cta-warm-copy {
+    color: #f1d6d8;
+  }
+
+  .tgem-cta-warm-button {
+    background: #f3f4f6;
+    color: #4b161b;
+  }
+
+  .tgem-cta-warm-button:hover {
+    background: #e5e7eb;
+  }
+
+  .tgem-cta-success {
+    border-color: rgb(34 197 94 / 0.28);
+    background: linear-gradient(180deg, #0f2f24 0%, #123528 100%);
+    color: #ecfdf5;
+    box-shadow: 0 10px 24px rgb(0 0 0 / 22%);
+  }
+
+  .tgem-cta-success-copy {
+    color: #cceedd;
+  }
+
+  .tgem-cta-success-button {
+    background: #1d5f43;
+    color: #f9fafb;
+  }
+
+  .tgem-cta-success-button:hover {
+    background: #256b4b;
+  }
+}
+
+/* Compatibility layer for legacy team detail pages that still use inline light-mode colors. */
+.tgem-shell [style*="color:#111"],
+.tgem-shell [style*="color: #111"],
+.tgem-shell [style*="color:#222"],
+.tgem-shell [style*="color: #222"],
+.tgem-shell [style*="color:#333"],
+.tgem-shell [style*="color: #333"] {
+  color: var(--foreground) !important;
+}
+
+.tgem-shell [style*="color:#444"],
+.tgem-shell [style*="color: #444"],
+.tgem-shell [style*="color:#555"],
+.tgem-shell [style*="color: #555"],
+.tgem-shell [style*="color:#666"],
+.tgem-shell [style*="color: #666"],
+.tgem-shell [style*="color:#999"],
+.tgem-shell [style*="color: #999"] {
+  color: var(--tgem-muted) !important;
+}
+
+.tgem-shell [style*="background:#fff"],
+.tgem-shell [style*="background: #fff"],
+.tgem-shell [style*="background: rgb(255, 255, 255)"],
+.tgem-shell [style*="background:#fafafa"],
+.tgem-shell [style*="background: #fafafa"],
+.tgem-shell [style*="background: rgb(250, 250, 250)"],
+.tgem-shell [style*="background:#f4f4f4"],
+.tgem-shell [style*="background: #f4f4f4"],
+.tgem-shell [style*="background: rgb(244, 244, 244)"],
+.tgem-shell [style*="background:#f4fbf6"],
+.tgem-shell [style*="background: #f4fbf6"],
+.tgem-shell [style*="background: rgb(244, 251, 246)"],
+.tgem-shell [style*="backgroundColor:#fff"],
+.tgem-shell [style*="backgroundColor: #fff"] {
+  background: var(--tgem-surface) !important;
+  background-color: var(--tgem-surface) !important;
+}
+
+.tgem-shell [style*="background:#f4fbf6"],
+.tgem-shell [style*="background: #f4fbf6"],
+.tgem-shell [style*="background: rgb(244, 251, 246)"] {
+  background: #123528 !important;
+  background-color: #123528 !important;
+}
+
+.tgem-shell [style*="border: 1px solid #ccc"],
+.tgem-shell [style*="border:1px solid #ccc"],
+.tgem-shell [style*="border: 1px solid #ddd"],
+.tgem-shell [style*="border:1px solid #ddd"],
+.tgem-shell [style*="border: 1px solid #eee"],
+.tgem-shell [style*="border:1px solid #eee"],
+.tgem-shell [style*="border-bottom: 1px solid #eee"],
+.tgem-shell [style*="border-bottom:1px solid #eee"],
+.tgem-shell [style*="border-bottom: 1px solid #f0f0f0"],
+.tgem-shell [style*="border-bottom:1px solid #f0f0f0"],
+.tgem-shell [style*="border-top: 1px solid #e6e6e6"],
+.tgem-shell [style*="border-top:1px solid #e6e6e6"],
+.tgem-shell [style*="border: 1px solid #e5e5e5"],
+.tgem-shell [style*="border:1px solid #e5e5e5"],
+.tgem-shell [style*="border: 1px solid #d8d8d8"],
+.tgem-shell [style*="border:1px solid #d8d8d8"],
+.tgem-shell [style*="border: 1px solid #d0d0d0"],
+.tgem-shell [style*="border:1px solid #d0d0d0"] {
+  border-color: var(--tgem-border) !important;
+}
+
+.tgem-shell [style*="border: 1px solid #d7e7db"],
+.tgem-shell [style*="border:1px solid #d7e7db"] {
+  border-color: #1d5f43 !important;
+}
+
+.tgem-shell [style*="color:#123b22"],
+.tgem-shell [style*="color: #123b22"],
+.tgem-shell [style*="color:#2b4b35"],
+.tgem-shell [style*="color: #2b4b35"] {
+  color: #cceedd !important;
+}
+
+.tgem-shell [style*="background:#15803d"],
+.tgem-shell [style*="background: #15803d"] {
+  background: #1d5f43 !important;
+  background-color: #1d5f43 !important;
+}
+
+.tgem-shell select,
+.tgem-shell input,
+.tgem-shell textarea {
+  background: var(--tgem-surface);
+  color: var(--foreground);
+  border-color: var(--tgem-border);
+}
+
+.tgem-color-swatch {
+  background: var(--swatch-color) !important;
+  background-color: var(--swatch-color) !important;
+  border-color: var(--tgem-border) !important;
 }

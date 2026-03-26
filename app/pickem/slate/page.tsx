@@ -706,41 +706,41 @@ function PickemSlatePageInner() {
 
   if (!slate) {
     return (
-      <main className="min-h-screen bg-gray-100 p-6">
-        <div className="max-w-6xl mx-auto text-red-700">{error ?? "Loading slate..."}</div>
+      <main className="tgem-page px-6 py-12">
+        <div className="mx-auto max-w-6xl text-red-700 dark:text-red-300">{error ?? "Loading slate..."}</div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-6xl mx-auto">
+    <main className="tgem-page px-6 py-12">
+      <div className="mx-auto max-w-6xl">
         <div className="mb-4">
-          <Link href="/pickem" className="text-sm text-gray-900 hover:underline">
+          <Link href="/pickem" className="text-sm text-gray-900 hover:underline dark:text-gray-100">
             {"< Back to Pick'em Hub"}
           </Link>
         </div>
 
-        <section className="rounded-xl bg-white p-5 shadow border border-gray-200 mb-5">
-          <h1 className="text-2xl font-bold text-gray-900">{slate.slateName}</h1>
-          <p className="text-sm text-gray-900 mt-1">
-            Season {slate.season} • Week {slate.week} • League: {slate.mode === "college" ? "College Football" : "NFL"}
-            {" • "}Setup: {(slate.entryMode ?? "auto") === "auto" ? "Auto" : "Manual"}
-            {" • "}Phase: {phaseToLabel(slatePhase)}
+        <section className="tgem-surface mb-5 rounded-3xl p-5">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{slate.slateName}</h1>
+          <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
+            Season {slate.season} - Week {slate.week} - League: {slate.mode === "college" ? "College Football" : "NFL"}
+            {" - "}Setup: {(slate.entryMode ?? "auto") === "auto" ? "Auto" : "Manual"}
+            {" - "}Phase: {phaseToLabel(slatePhase)}
           </p>
-          <p className="text-sm text-gray-900 mt-2">
+          <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
             Picks made: <strong>{pickedCount}</strong> / {games.length}
           </p>
-          <p className="text-sm text-gray-900 mt-1">
+          <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
             Record: <strong>{record.wins}-{record.losses}</strong>
-            {record.pushes > 0 ? `-${record.pushes}` : ""} • Pending: {record.pending}
+            {record.pushes > 0 ? `-${record.pushes}` : ""} - Pending: {record.pending}
           </p>
           <div className="mt-3 flex gap-2 flex-wrap">
             <button
               type="button"
               onClick={() => void refreshGames()}
               disabled={(slate.entryMode ?? "auto") !== "auto"}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
+              className="tgem-button-secondary rounded-lg px-3 py-2 text-sm"
             >
               Refresh Games/Results
             </button>
@@ -769,42 +769,42 @@ function PickemSlatePageInner() {
             </button>
           </div>
           <TgemDisclaimer compact />
-          {error ? <p className="text-sm text-red-700 mt-3">{error}</p> : null}
+          {error ? <p className="mt-3 text-sm text-red-700 dark:text-red-300">{error}</p> : null}
         </section>
 
         {(slate.entryMode ?? "auto") === "manual" ? (
-          <section className="rounded-xl bg-white p-5 shadow border border-gray-200 mb-5">
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">Add Manual Matchup</h2>
+          <section className="tgem-surface mb-5 rounded-3xl p-5">
+            <h2 className="mb-3 text-xl font-semibold text-gray-900 dark:text-gray-100">Add Manual Matchup</h2>
             <div className="grid gap-3 md:grid-cols-2">
               <input
                 type="text"
                 value={manualAwayTeam}
                 onChange={(e) => setManualAwayTeam(e.target.value)}
                 placeholder="Away Team"
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="tgem-input rounded-lg px-3 py-2 text-sm"
               />
               <input
                 type="text"
                 value={manualHomeTeam}
                 onChange={(e) => setManualHomeTeam(e.target.value)}
                 placeholder="Home Team"
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="tgem-input rounded-lg px-3 py-2 text-sm"
               />
               <input
                 type="datetime-local"
                 value={manualStartDate}
                 onChange={(e) => setManualStartDate(e.target.value)}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="tgem-input rounded-lg px-3 py-2 text-sm"
               />
               <input
                 type="text"
                 value={manualVenue}
                 onChange={(e) => setManualVenue(e.target.value)}
                 placeholder="Venue (optional)"
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              />
+                className="tgem-input rounded-lg px-3 py-2 text-sm"
+            />
             </div>
-            <label className="mt-3 flex items-center gap-2 text-sm text-gray-800">
+            <label className="mt-3 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <input
                 type="checkbox"
                 checked={manualNeutralSite}
@@ -822,23 +822,23 @@ function PickemSlatePageInner() {
           </section>
         ) : null}
 
-        <section className="rounded-xl bg-white p-5 shadow border border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900 mb-3">Games</h2>
+        <section className="tgem-surface rounded-3xl p-5">
+          <h2 className="mb-3 text-xl font-semibold text-gray-900 dark:text-gray-100">Games</h2>
 
           {loading ? (
-            <div className="text-gray-700">Loading games...</div>
+            <div className="text-gray-700 dark:text-gray-300">Loading games...</div>
           ) : games.length === 0 ? (
-            <div className="text-gray-700">No FBS games found for this week.</div>
+            <div className="text-gray-700 dark:text-gray-300">No FBS games found for this week.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="bg-gray-50">
-                    <th className="text-left p-2 border-b border-gray-200">Date</th>
-                    <th className="text-left p-2 border-b border-gray-200">Matchup</th>
-                    <th className="text-left p-2 border-b border-gray-200">Venue</th>
-                    <th className="text-left p-2 border-b border-gray-200">TGEM</th>
-                    <th className="text-left p-2 border-b border-gray-200">Pick</th>
+                  <tr className="bg-gray-50 dark:bg-gray-950/70">
+                    <th className="border-b border-gray-200 p-2 text-left dark:border-gray-800">Date</th>
+                    <th className="border-b border-gray-200 p-2 text-left dark:border-gray-800">Matchup</th>
+                    <th className="border-b border-gray-200 p-2 text-left dark:border-gray-800">Venue</th>
+                    <th className="border-b border-gray-200 p-2 text-left dark:border-gray-800">TGEM</th>
+                    <th className="border-b border-gray-200 p-2 text-left dark:border-gray-800">Pick</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -849,36 +849,36 @@ function PickemSlatePageInner() {
 
                     return (
                       <tr key={gameId}>
-                        <td className="p-2 border-b border-gray-100 text-sm">{fmtDate(g.startDate)}</td>
-                        <td className="p-2 border-b border-gray-100 text-sm">
+                        <td className="border-b border-gray-100 p-2 text-sm dark:border-gray-800">{fmtDate(g.startDate)}</td>
+                        <td className="border-b border-gray-100 p-2 text-sm dark:border-gray-800">
                           {g.awayTeam ?? "TBD"} @ {g.homeTeam ?? "TBD"}
                           {g.homePoints != null && g.awayPoints != null ? (
-                            <span className="text-gray-700"> ({g.awayPoints}-{g.homePoints})</span>
+                            <span className="text-gray-700 dark:text-gray-300"> ({g.awayPoints}-{g.homePoints})</span>
                           ) : null}
                         </td>
-                        <td className="p-2 border-b border-gray-100 text-sm">
+                        <td className="border-b border-gray-100 p-2 text-sm dark:border-gray-800">
                           {g.venue ?? "TBD"}
                           {g.neutralSite ? " (Neutral)" : ""}
                         </td>
-                        <td className="p-2 border-b border-gray-100 text-sm">
+                        <td className="border-b border-gray-100 p-2 text-sm dark:border-gray-800">
                           <div className="flex flex-col gap-1">
                             <button
                               type="button"
                               onClick={() => void suggestGame(g)}
                               disabled={busy}
-                              className="rounded border border-indigo-300 px-2 py-1 text-indigo-900 hover:bg-indigo-50 disabled:opacity-50"
+                              className="rounded border border-indigo-300 px-2 py-1 text-indigo-900 hover:bg-indigo-50 disabled:opacity-50 dark:border-indigo-700 dark:text-indigo-200 dark:hover:bg-indigo-950/40"
                             >
                               Suggest
                             </button>
                             {suggestion ? (
                               <>
-                                <span className="text-xs text-gray-700">
+                                <span className="text-xs text-gray-700 dark:text-gray-300">
                                   {typeof suggestion.confidence === "number" && suggestion.confidence < AUTO_PICK_CONFIDENCE_MIN
                                     ? "TOSS-UP"
                                     : suggestion.pick.toUpperCase()}{" "}
-                                  • Conf {suggestion.confidence ?? "N/A"}
+                                  {" - "}Conf {suggestion.confidence ?? "N/A"}
                                 </span>
-                                <span className="text-xs text-gray-700">
+                                <span className="text-xs text-gray-700 dark:text-gray-300">
                                   {suggestion
                                     ? buildCoachLeanSynopsis(suggestion, g, slatePhase)
                                     : gameNotes[g.id] || "Coach read: no TGEM synopsis yet. Run Suggest to generate a lean."}
@@ -886,13 +886,13 @@ function PickemSlatePageInner() {
                               </>
                             ) : null}
                             {!suggestion ? (
-                              <span className="text-xs text-gray-700">
+                              <span className="text-xs text-gray-700 dark:text-gray-300">
                                 {gameNotes[g.id] || "Coach read: no TGEM synopsis yet. Run Suggest to generate a lean."}
                               </span>
                             ) : null}
                           </div>
                         </td>
-                        <td className="p-2 border-b border-gray-100 text-sm">
+                        <td className="border-b border-gray-100 p-2 text-sm dark:border-gray-800">
                           <div className="flex gap-2 flex-wrap">
                             <button
                               type="button"
@@ -900,8 +900,8 @@ function PickemSlatePageInner() {
                               disabled={locked}
                               className={`rounded border px-2 py-1 ${
                                 pick === "away"
-                                  ? "border-blue-700 bg-blue-50 text-blue-900"
-                                  : "border-gray-300 text-gray-800"
+                                  ? "border-blue-700 bg-blue-50 text-blue-900 dark:border-blue-500 dark:bg-blue-950/40 dark:text-blue-100"
+                                  : "border-gray-300 text-gray-800 dark:border-gray-700 dark:text-gray-200"
                               } disabled:opacity-50`}
                             >
                               {g.awayTeam ?? "Away"}
@@ -912,8 +912,8 @@ function PickemSlatePageInner() {
                               disabled={locked}
                               className={`rounded border px-2 py-1 ${
                                 pick === "home"
-                                  ? "border-red-700 bg-red-50 text-red-900"
-                                  : "border-gray-300 text-gray-800"
+                                  ? "border-red-700 bg-red-50 text-red-900 dark:border-red-500 dark:bg-red-950/40 dark:text-red-100"
+                                  : "border-gray-300 text-gray-800 dark:border-gray-700 dark:text-gray-200"
                               } disabled:opacity-50`}
                             >
                               {g.homeTeam ?? "Home"}
@@ -922,7 +922,7 @@ function PickemSlatePageInner() {
                               type="button"
                               onClick={() => setPick(gameId, null)}
                               disabled={locked}
-                              className="rounded border border-gray-300 px-2 py-1 text-gray-700 disabled:opacity-50"
+                              className="rounded border border-gray-300 px-2 py-1 text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300"
                             >
                               Clear
                             </button>
@@ -945,8 +945,8 @@ export default function PickemSlatePage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen bg-gray-100 p-6">
-          <div className="max-w-6xl mx-auto text-gray-700">Loading slate...</div>
+        <main className="tgem-page px-6 py-12">
+          <div className="mx-auto max-w-6xl text-gray-700 dark:text-gray-300">Loading slate...</div>
         </main>
       }
     >

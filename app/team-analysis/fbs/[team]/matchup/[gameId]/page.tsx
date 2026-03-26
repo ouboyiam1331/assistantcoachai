@@ -583,7 +583,7 @@ export default function MatchupPage() {
       </div>
 
       <h1 style={{ marginTop: 0, marginBottom: 8 }}>{seoHeading}</h1>
-      <p style={{ marginTop: 0, marginBottom: 16, maxWidth: 820, color: "#444", lineHeight: 1.6 }}>
+      <p style={{ marginTop: 0, marginBottom: 16, maxWidth: 820, color: "var(--tgem-muted-strong)", lineHeight: 1.6 }}>
         {seoDescription}
       </p>
 
@@ -594,10 +594,10 @@ export default function MatchupPage() {
       ) : (
         <>
           <div style={{ marginBottom: 14 }}>
-            <div style={{ color: "#444" }}>
+            <div style={{ color: "var(--tgem-muted-strong)" }}>
               <strong>Team:</strong> {teamSlug}{" "}
-              <span style={{ color: "#999" }}>|</span> <strong>Season:</strong>{" "}
-              {seasonYear} <span style={{ color: "#999" }}>|</span>{" "}
+              <span style={{ color: "var(--tgem-muted)" }}>|</span> <strong>Season:</strong>{" "}
+              {seasonYear} <span style={{ color: "var(--tgem-muted)" }}>|</span>{" "}
               <strong>Opponent:</strong> {opponentSlug || "Resolving…"}
             </div>
 
@@ -627,7 +627,7 @@ export default function MatchupPage() {
               id="phaseOverride"
               value={phaseOverride}
               onChange={(e) => setPhaseOverride(e.target.value as "auto" | TgemPhase)}
-              style={{ border: "1px solid #ccc", borderRadius: 6, padding: "4px 8px" }}
+              style={{ border: "1px solid var(--tgem-border)", borderRadius: 6, padding: "4px 8px", background: "var(--tgem-surface)", color: "var(--foreground)" }}
             >
               <option value="auto">Auto ({autoPhase.toUpperCase()})</option>
               <option value="regular">Regular</option>
@@ -635,7 +635,7 @@ export default function MatchupPage() {
               <option value="bowl">Bowl</option>
               <option value="cfp">CFP</option>
             </select>
-            <span style={{ color: "#666", fontSize: 13 }}>
+            <span style={{ color: "var(--tgem-muted)", fontSize: 13 }}>
               Effective: {effectivePhase.toUpperCase()}
             </span>
           </div>
@@ -651,6 +651,7 @@ export default function MatchupPage() {
                 border: "1px solid #eee",
                 borderRadius: 12,
                 padding: 14,
+                color: "var(--foreground)",
               }}
             >
               <div style={{ marginBottom: 8 }}>
@@ -681,13 +682,13 @@ export default function MatchupPage() {
                 )}
               </div>
               {typeof tgem.ratings?.delta === "number" ? (
-                <div style={{ marginBottom: 8, fontSize: 13, color: "#555" }}>
+                <div style={{ marginBottom: 8, fontSize: 13, color: "var(--tgem-muted-strong)" }}>
                   Rating Edge = {teamSlug} rating minus {opponentSlug} rating.
                   Positive favors {teamSlug}; negative favors {opponentSlug}.
                 </div>
               ) : null}
               {coachRead ? (
-                <div style={{ marginBottom: 10, lineHeight: 1.5, color: "#222" }}>
+                <div style={{ marginBottom: 10, lineHeight: 1.5, color: "var(--foreground)" }}>
                   <strong>TGEM Coach Read:</strong> {coachRead}
                 </div>
               ) : null}
@@ -695,15 +696,15 @@ export default function MatchupPage() {
                 <strong>Reasons Table (Away vs Home):</strong>
               </div>
               {reasonTable ? (
-                <div style={{ overflowX: "auto" }}>
+                <div style={{ overflowX: "auto", color: "var(--foreground)" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
-                      <tr style={{ background: "#fafafa" }}>
+                      <tr style={{ background: "var(--tgem-surface-subtle)", color: "var(--foreground)" }}>
                         <th
                           style={{
                             textAlign: "left",
                             padding: 8,
-                            borderBottom: "1px solid #eee",
+                            borderBottom: "1px solid var(--tgem-border)",
                           }}
                         >
                           Away ({game.awayTeam ?? "Away"})
@@ -712,7 +713,7 @@ export default function MatchupPage() {
                           style={{
                             textAlign: "left",
                             padding: 8,
-                            borderBottom: "1px solid #eee",
+                            borderBottom: "1px solid var(--tgem-border)",
                           }}
                         >
                           Reason
@@ -721,7 +722,7 @@ export default function MatchupPage() {
                           style={{
                             textAlign: "left",
                             padding: 8,
-                            borderBottom: "1px solid #eee",
+                            borderBottom: "1px solid var(--tgem-border)",
                           }}
                         >
                           Home ({game.homeTeam ?? "Home"})
@@ -730,20 +731,21 @@ export default function MatchupPage() {
                     </thead>
                     <tbody>
                       {reasonTable.map((row) => (
-                        <tr key={row.reason}>
-                          <td style={{ padding: 8, borderBottom: "1px solid #f0f0f0" }}>
+                        <tr key={row.reason} style={{ color: "var(--foreground)" }}>
+                          <td style={{ padding: 8, borderBottom: "1px solid var(--tgem-border)", color: "var(--foreground)" }}>
                             {row.away}
                           </td>
                           <td
                             style={{
                               padding: 8,
-                              borderBottom: "1px solid #f0f0f0",
+                              borderBottom: "1px solid var(--tgem-border)",
                               fontWeight: 600,
+                              color: "var(--foreground)",
                             }}
                           >
                             {row.reason}
                           </td>
-                          <td style={{ padding: 8, borderBottom: "1px solid #f0f0f0" }}>
+                          <td style={{ padding: 8, borderBottom: "1px solid var(--tgem-border)", color: "var(--foreground)" }}>
                             {row.home}
                           </td>
                         </tr>
@@ -752,7 +754,7 @@ export default function MatchupPage() {
                   </table>
                 </div>
               ) : (
-                <ul style={{ marginTop: 6 }}>
+                <ul style={{ marginTop: 6, color: "var(--foreground)" }}>
                   {(tgem.reasons ?? []).map((r, i) => (
                     <li key={i}>{r}</li>
                   ))}
@@ -762,9 +764,9 @@ export default function MatchupPage() {
               {tgem.stats ? (
                 <>
                   <hr style={{ margin: "14px 0" }} />
-                  <div style={{ fontSize: 13, color: "#555" }}>
+                  <div style={{ fontSize: 13, color: "var(--tgem-muted-strong)" }}>
                     <strong>Stats Snapshot:</strong>
-                    <pre style={{ whiteSpace: "pre-wrap" }}>
+                    <pre style={{ whiteSpace: "pre-wrap", color: "var(--foreground)" }}>
                       {JSON.stringify(tgem.stats, null, 2)}
                     </pre>
                   </div>
@@ -772,19 +774,11 @@ export default function MatchupPage() {
               ) : null}
 	            </div>
 	          )}
-          <div
-            style={{
-              marginTop: 16,
-              border: "1px solid #d7e7db",
-              borderRadius: 12,
-              padding: 16,
-              background: "#f4fbf6",
-            }}
-          >
-            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6, color: "#123b22" }}>
+          <div className="tgem-cta-success" style={{ marginTop: 16, padding: 16 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
               Ready to turn this lean into a live board?
             </div>
-            <p style={{ margin: "0 0 12px 0", color: "#2b4b35", lineHeight: 1.6 }}>
+            <p className="tgem-cta-success-copy" style={{ margin: "0 0 12px 0", lineHeight: 1.6 }}>
               Open Pick&apos;em Mode to build a slate, compare TGEM reads across games,
               and make your own picks. You can always go against the lean if your read
               says the spot is different.
@@ -794,12 +788,11 @@ export default function MatchupPage() {
               style={{
                 display: "inline-block",
                 borderRadius: 10,
-                background: "#15803d",
-                color: "#fff",
                 fontWeight: 700,
                 padding: "10px 14px",
                 textDecoration: "none",
               }}
+              className="tgem-cta-success-button"
             >
               Open Pick&apos;em Mode
             </Link>

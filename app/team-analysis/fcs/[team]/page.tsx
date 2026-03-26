@@ -69,6 +69,15 @@ type FcsMeta = {
 
 type SeasonTotals = Record<string, number>;
 type TGEMPhase = "regular" | "championship" | "postseason";
+const LEGACY_UI = {
+  surface: "var(--tgem-surface)",
+  subtle: "var(--tgem-surface-subtle)",
+  border: "var(--tgem-border)",
+  text: "var(--foreground)",
+  muted: "var(--tgem-muted)",
+  mutedStrong: "var(--tgem-muted-strong)",
+  danger: "#b00020",
+};
 
 function fmt(n: number | null | undefined) {
   if (n === null || n === undefined) return "N/A";
@@ -188,7 +197,9 @@ function ColorSwatch({ value, label }: { value: string | null | undefined; label
       aria-label={`${label} color swatch`}
     >
       <span
+        className="tgem-color-swatch"
         style={{
+          ["--swatch-color" as string]: color,
           width: 28,
           height: 28,
           borderRadius: 5,
@@ -664,8 +675,8 @@ export default function FcsTeamPage() {
         </div>
         <div>
           <h1 style={{ margin: 0, fontSize: 28 }}>{teamName}</h1>
-          <div style={{ marginTop: 6, color: "#444" }}>
-            <strong>Conference:</strong> {safeStr(meta?.conference)} <span style={{ color: "#999" }}>|</span>{" "}
+          <div style={{ marginTop: 6, color: LEGACY_UI.mutedStrong }}>
+            <strong>Conference:</strong> {safeStr(meta?.conference)} <span style={{ color: LEGACY_UI.muted }}>|</span>{" "}
             <strong>Classification:</strong> {safeStr(meta?.classification ?? "FCS")}
           </div>
         </div>
@@ -674,7 +685,7 @@ export default function FcsTeamPage() {
       <hr style={{ margin: "18px 0" }} />
 
       <h2 style={{ margin: "0 0 10px 0", fontSize: 18 }}>Team Metadata</h2>
-      <div className="tgem-card" style={{ border: "1px solid #e6e6e6", borderRadius: 12, padding: 14, marginBottom: 16, background: "#fff" }}>
+      <div className="tgem-card" style={{ border: `1px solid ${LEGACY_UI.border}`, borderRadius: 12, padding: 14, marginBottom: 16, background: LEGACY_UI.surface }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <div><strong>Abbreviation:</strong> {safeStr(meta?.abbreviation)}</div>
           <div><strong>Mascot:</strong> {safeStr(meta?.mascot)}</div>
@@ -690,7 +701,7 @@ export default function FcsTeamPage() {
             ) : (
               safeStr(colorProfile.primary)
             )}
-            <div style={{ marginTop: 6, fontSize: 12, color: "#666" }}>
+            <div style={{ marginTop: 6, fontSize: 12, color: LEGACY_UI.muted }}>
               {colorProfile.sourceUrl ? (
                 <>
                   {colorProfile.disclaimer}{" "}
@@ -713,7 +724,7 @@ export default function FcsTeamPage() {
       </div>
 
       <h2 style={{ margin: "0 0 10px 0", fontSize: 18 }}>Stadium / Location</h2>
-      <div className="tgem-card" style={{ border: "1px solid #e6e6e6", borderRadius: 12, padding: 14, marginBottom: 18, background: "#fff" }}>
+      <div className="tgem-card" style={{ border: `1px solid ${LEGACY_UI.border}`, borderRadius: 12, padding: 14, marginBottom: 18, background: LEGACY_UI.surface }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <div><strong>Stadium:</strong> {safeStr(location?.name)}</div>
           <div>
@@ -738,10 +749,10 @@ export default function FcsTeamPage() {
         style={{
           marginTop: 16,
           marginBottom: 16,
-          border: "1px solid #e5e5e5",
+          border: `1px solid ${LEGACY_UI.border}`,
           borderRadius: 12,
           padding: 12,
-          background: "#fafafa",
+          background: LEGACY_UI.subtle,
         }}
       >
         <h2 style={{ margin: "0 0 10px 0", fontSize: 18 }}>TGEM v11 - Team Analysis</h2>
@@ -777,8 +788,8 @@ export default function FcsTeamPage() {
                   fontSize: 12,
                   padding: "2px 8px",
                   borderRadius: 999,
-                  border: "1px solid #d8d8d8",
-                  background: "#fff",
+                  border: `1px solid ${LEGACY_UI.border}`,
+                  background: LEGACY_UI.surface,
                 }}
               >
                 {flag}
@@ -791,7 +802,7 @@ export default function FcsTeamPage() {
           <div style={{ margin: "0 0 8px 0", fontSize: 16 }}>
             <strong>TGEM Read</strong>
           </div>
-          <div style={{ color: "#222", lineHeight: 1.45 }}>
+          <div style={{ color: LEGACY_UI.text, lineHeight: 1.45 }}>
             {tgemCoach.read.map((line, idx) => (
               <p key={`${idx}_${line}`} style={{ margin: "0 0 8px 0" }}>
                 {line}
@@ -837,21 +848,21 @@ export default function FcsTeamPage() {
           </div>
         </div>
       </section>
-      <section className="tgem-card" style={{ marginTop: 14, padding: 12, border: "1px solid #ddd", borderRadius: 10, background: "#fff" }}>
-        <div style={{ fontWeight: 800, marginBottom: 8, color: "#111" }}>Season Stats ({seasonStatsYear})</div>
+      <section className="tgem-card" style={{ marginTop: 14, padding: 12, border: `1px solid ${LEGACY_UI.border}`, borderRadius: 10, background: LEGACY_UI.surface }}>
+        <div style={{ fontWeight: 800, marginBottom: 8, color: LEGACY_UI.text }}>Season Stats ({seasonStatsYear})</div>
         {seasonStatsNote ? (
-          <div style={{ marginBottom: 8, color: "#333", fontSize: 13 }}>{seasonStatsNote}</div>
+          <div style={{ marginBottom: 8, color: LEGACY_UI.mutedStrong, fontSize: 13 }}>{seasonStatsNote}</div>
         ) : null}
         {seasonStatsLoading ? (
-          <div style={{ color: "#333" }}>Loading season stats...</div>
+          <div style={{ color: LEGACY_UI.mutedStrong }}>Loading season stats...</div>
         ) : seasonStatsError ? (
-          <div style={{ color: "#b00020" }}>Season stats error: {seasonStatsError}</div>
+          <div style={{ color: LEGACY_UI.danger }}>Season stats error: {seasonStatsError}</div>
         ) : showPendingSeasonStatsMessage ? (
-          <div style={{ color: "#333" }}>{buildPendingSeasonMessage(seasonStatsYear)}</div>
+          <div style={{ color: LEGACY_UI.mutedStrong }}>{buildPendingSeasonMessage(seasonStatsYear)}</div>
         ) : !seasonStats ? (
-          <div style={{ color: "#333" }}>No season stats available.</div>
+          <div style={{ color: LEGACY_UI.mutedStrong }}>No season stats available.</div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, color: "#111" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, color: LEGACY_UI.text }}>
             <div><strong>Games:</strong> {seasonStats.games ?? "N/A"}</div>
             <div />
             <div><strong>Offense PPG:</strong> {fmtNum(seasonStats.pointsPerGame)}</div>
@@ -875,7 +886,7 @@ export default function FcsTeamPage() {
           <div style={{ marginTop: 12 }}>
             <hr style={{ margin: "10px 0" }} />
             <div style={{ fontWeight: 700, marginBottom: 8 }}>Extended Season Totals (CFBD)</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, color: "#111" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, color: LEGACY_UI.text }}>
               {Object.entries(seasonTotals)
                 .sort(([a], [b]) => a.localeCompare(b))
                 .map(([k, v]) => (
@@ -887,7 +898,7 @@ export default function FcsTeamPage() {
           </div>
         ) : null}
         {!seasonStatsNote && !showPendingSeasonStatsMessage ? (
-          <div style={{ marginTop: 10, color: "#333", fontSize: 13 }}>
+          <div style={{ marginTop: 10, color: LEGACY_UI.mutedStrong, fontSize: 13 }}>
             Showing {seasonStatsYear} season stats.
           </div>
         ) : null}
@@ -913,23 +924,23 @@ export default function FcsTeamPage() {
         style={{
           marginTop: 14,
           padding: 12,
-          border: "1px solid #ddd",
+          border: `1px solid ${LEGACY_UI.border}`,
           borderRadius: 10,
-          background: "#fff",
+          background: LEGACY_UI.surface,
         }}
       >
       <h2 style={{ margin: "0 0 10px 0", fontSize: 18 }}>Schedule (Season {scheduleSeasonYear})</h2>
       {scheduleLoading ? (
-        <div style={{ color: "#666" }}>Loading schedule...</div>
+        <div style={{ color: LEGACY_UI.muted }}>Loading schedule...</div>
       ) : scheduleError ? (
-        <div style={{ color: "#b00020" }}>Schedule error: {scheduleError}</div>
+        <div style={{ color: LEGACY_UI.danger }}>Schedule error: {scheduleError}</div>
       ) : schedule.length === 0 ? (
-        <div style={{ color: "#666" }}>No games returned for season {scheduleSeasonYear}.</div>
+        <div style={{ color: LEGACY_UI.muted }}>No games returned for season {scheduleSeasonYear}.</div>
       ) : (
-        <div style={{ overflowX: "auto", border: "1px solid #eee", borderRadius: 12 }}>
+        <div style={{ overflowX: "auto", border: `1px solid ${LEGACY_UI.border}`, borderRadius: 12 }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr style={{ background: "#fafafa" }}>
+              <tr style={{ background: LEGACY_UI.subtle }}>
                 <th style={{ textAlign: "left", padding: 10, borderBottom: "1px solid #eee" }}>Week</th>
                 <th style={{ textAlign: "left", padding: 10, borderBottom: "1px solid #eee" }}>Date</th>
                 <th style={{ textAlign: "left", padding: 10, borderBottom: "1px solid #eee" }}>Matchup</th>

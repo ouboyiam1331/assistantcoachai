@@ -55,18 +55,18 @@ export default function FcsByTeamPage() {
   }, [teams, query]);
 
   return (
-    <main className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-5xl mx-auto">
-        <div className="mb-4 flex gap-3 text-sm">
+    <main className="tgem-page px-6 py-12">
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-4 flex gap-3 text-sm text-gray-700 dark:text-gray-300">
           <Link href="/team-analysis/fcs" className="hover:underline">
-            ← FCS Home
+            {"<- FCS Home"}
           </Link>
           <Link href="/team-analysis" className="hover:underline">
             Team Analysis
           </Link>
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-3">
+        <h1 className="mb-3 text-2xl font-bold text-gray-900 dark:text-gray-100">
           FCS Teams ({year})
         </h1>
         <input
@@ -74,33 +74,35 @@ export default function FcsByTeamPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search FCS teams..."
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 mb-4"
+          className="tgem-input mb-4 w-full rounded-lg px-3 py-2"
         />
 
-        {loading ? <div>Loading teams...</div> : null}
-        {error ? <div className="text-red-700">Error: {error}</div> : null}
+        {loading ? <div className="text-gray-700 dark:text-gray-300">Loading teams...</div> : null}
+        {error ? <div className="text-red-700 dark:text-red-300">Error: {error}</div> : null}
 
         {!loading && !error ? (
-          <div className="rounded-xl bg-white border border-gray-200 overflow-hidden">
+          <div className="tgem-surface overflow-hidden rounded-3xl">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-gray-50">
-                  <th className="text-left p-3 border-b">Team</th>
-                  <th className="text-left p-3 border-b">Conference</th>
+                <tr className="bg-gray-50 dark:bg-gray-950/70">
+                  <th className="border-b border-gray-200 p-3 text-left dark:border-gray-800">Team</th>
+                  <th className="border-b border-gray-200 p-3 text-left dark:border-gray-800">Conference</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((t) => (
                   <tr key={t.slug}>
-                    <td className="p-3 border-b">
+                    <td className="border-b border-gray-200 p-3 dark:border-gray-800">
                       <Link
                         href={`/team-analysis/fcs/${encodeURIComponent(t.slug)}?from=by-team`}
-                        className="underline"
+                        className="underline text-gray-900 dark:text-gray-100"
                       >
                         {t.school}
                       </Link>
                     </td>
-                    <td className="p-3 border-b">{t.conference ?? "N/A"}</td>
+                    <td className="border-b border-gray-200 p-3 text-gray-700 dark:border-gray-800 dark:text-gray-300">
+                      {t.conference ?? "N/A"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

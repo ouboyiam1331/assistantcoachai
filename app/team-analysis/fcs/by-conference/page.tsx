@@ -76,28 +76,28 @@ export default function FcsByConferencePage() {
   }, [conferences, openConference]);
 
   return (
-    <main className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-5xl mx-auto">
-        <div className="mb-4 flex gap-3 text-sm">
+    <main className="tgem-page px-6 py-12">
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-4 flex gap-3 text-sm text-gray-700 dark:text-gray-300">
           <Link href="/team-analysis/fcs" className="hover:underline">
-            {"← FCS Home"}
+            {"<- FCS Home"}
           </Link>
           <Link href="/team-analysis" className="hover:underline">
             Team Analysis
           </Link>
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-3">
+        <h1 className="mb-3 text-2xl font-bold text-gray-900 dark:text-gray-100">
           FCS - Select Team by Conference ({year})
         </h1>
 
-        <p className="text-gray-900 mb-6">
+        <p className="mb-6 text-gray-700 dark:text-gray-300">
           Expand a conference to view teams, then select a program to open its
           TGEM team dashboard.
         </p>
 
-        {loading ? <div>Loading conferences...</div> : null}
-        {error ? <div className="text-red-700">Error: {error}</div> : null}
+        {loading ? <div className="text-gray-700 dark:text-gray-300">Loading conferences...</div> : null}
+        {error ? <div className="text-red-700 dark:text-red-300">Error: {error}</div> : null}
 
         {!loading && !error ? (
           <div className="space-y-4">
@@ -105,27 +105,24 @@ export default function FcsByConferencePage() {
               const isOpen = openConference === conf;
               const confTeams = teamsByConference[conf] ?? [];
               return (
-                <div
-                  key={conf}
-                  className="rounded-xl bg-white shadow border border-gray-200"
-                >
+                <div key={conf} className="tgem-surface rounded-3xl">
                   <button
                     type="button"
-                    className="flex w-full items-center justify-between px-4 py-3 text-left text-gray-900"
+                    className="flex w-full items-center justify-between px-4 py-3 text-left text-gray-900 dark:text-gray-100"
                     onClick={() => setOpenConference(isOpen ? null : conf)}
                   >
                     <span className="font-semibold">
                       {conf} ({confTeams.length} teams)
                     </span>
-                    <span className="text-gray-800 text-sm">
-                      {isOpen ? "▲" : "▼"}
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      {isOpen ? "[-]" : "[+]"}
                     </span>
                   </button>
 
                   {isOpen ? (
-                    <div className="border-t border-gray-200 px-4 py-3">
+                    <div className="border-t border-gray-200 px-4 py-3 dark:border-gray-800">
                       {confTeams.length === 0 ? (
-                        <p className="text-sm text-gray-900">
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
                           No teams found for this conference.
                         </p>
                       ) : (
@@ -134,7 +131,7 @@ export default function FcsByConferencePage() {
                             <li key={team.slug}>
                               <Link
                                 href={`/team-analysis/fcs/${encodeURIComponent(team.slug)}?from=by-conference`}
-                                className="block w-full rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-900 hover:bg-gray-100 border border-gray-200"
+                                className="tgem-surface-subtle block rounded-2xl px-3 py-2 text-sm text-gray-900 transition hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-900"
                               >
                                 {team.school}
                               </Link>

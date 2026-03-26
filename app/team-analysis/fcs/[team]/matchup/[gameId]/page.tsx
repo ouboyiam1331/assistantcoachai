@@ -446,19 +446,19 @@ export default function FcsMatchupPage() {
       </div>
 
       <h1 style={{ marginTop: 0, marginBottom: 8 }}>{seoHeading}</h1>
-      <p style={{ marginTop: 0, marginBottom: 16, maxWidth: 820, color: "#444", lineHeight: 1.6 }}>
+      <p style={{ marginTop: 0, marginBottom: 16, maxWidth: 820, color: "var(--tgem-muted-strong)", lineHeight: 1.6 }}>
         {seoDescription}
       </p>
       {err ? <div style={{ color: "#b00020" }}>{err}</div> : null}
 
       {!game ? (
-        <div style={{ color: "#666" }}>Loading game...</div>
+        <div style={{ color: "var(--tgem-muted)" }}>Loading game...</div>
       ) : (
         <>
           <div style={{ marginBottom: 14 }}>
-            <div style={{ color: "#444" }}>
-              <strong>Team:</strong> {teamName} <span style={{ color: "#999" }}>|</span>{" "}
-              <strong>Season:</strong> {seasonYear} <span style={{ color: "#999" }}>|</span>{" "}
+            <div style={{ color: "var(--tgem-muted-strong)" }}>
+              <strong>Team:</strong> {teamName} <span style={{ color: "var(--tgem-muted)" }}>|</span>{" "}
+              <strong>Season:</strong> {seasonYear} <span style={{ color: "var(--tgem-muted)" }}>|</span>{" "}
               <strong>Opponent:</strong> {opponentName || "Resolving..."}
             </div>
             <h2 style={{ marginBottom: 6 }}>{title}</h2>
@@ -481,7 +481,7 @@ export default function FcsMatchupPage() {
               id="phaseOverride"
               value={phaseOverride}
               onChange={(e) => setPhaseOverride(e.target.value as "auto" | TgemPhase)}
-              style={{ border: "1px solid #ccc", borderRadius: 6, padding: "4px 8px" }}
+              style={{ border: "1px solid var(--tgem-border)", borderRadius: 6, padding: "4px 8px", background: "var(--tgem-surface)", color: "var(--foreground)" }}
             >
               <option value="auto">Auto ({autoPhase.toUpperCase()})</option>
               <option value="regular">Regular</option>
@@ -489,16 +489,19 @@ export default function FcsMatchupPage() {
               <option value="bowl">Bowl</option>
               <option value="cfp">CFP</option>
             </select>
-            <span style={{ color: "#666", fontSize: 13 }}>
+            <span style={{ color: "var(--tgem-muted)", fontSize: 13 }}>
               Effective: {effectivePhase.toUpperCase()}
             </span>
           </div>
           {tgemErr ? (
             <div style={{ color: "#b00020" }}>{tgemErr}</div>
           ) : !tgem ? (
-            <div style={{ color: "#666" }}>Running TGEM...</div>
+            <div style={{ color: "var(--tgem-muted)" }}>Running TGEM...</div>
           ) : (
-            <div className="tgem-card" style={{ border: "1px solid #eee", borderRadius: 12, padding: 14 }}>
+            <div
+              className="tgem-card"
+              style={{ border: "1px solid #eee", borderRadius: 12, padding: 14, color: "var(--foreground)" }}
+            >
               <div style={{ marginBottom: 8 }}>
                 <strong>Lean:</strong> {tgem.lean ?? "UNDEFINED"}
               </div>
@@ -517,7 +520,7 @@ export default function FcsMatchupPage() {
                 )}
               </div>
               {coachRead ? (
-                <div style={{ marginBottom: 10, lineHeight: 1.5, color: "#222" }}>
+                <div style={{ marginBottom: 10, lineHeight: 1.5, color: "var(--foreground)" }}>
                   <strong>TGEM Coach Read:</strong> {coachRead}
                 </div>
               ) : null}
@@ -525,32 +528,32 @@ export default function FcsMatchupPage() {
                 <strong>Reasons Table (Away vs Home):</strong>
               </div>
               {reasonTable ? (
-                <div style={{ overflowX: "auto" }}>
+                <div style={{ overflowX: "auto", color: "var(--foreground)" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
-                      <tr style={{ background: "#fafafa" }}>
-                        <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #eee" }}>
+                      <tr style={{ background: "var(--tgem-surface-subtle)", color: "var(--foreground)" }}>
+                        <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid var(--tgem-border)" }}>
                           Away ({game.awayTeam ?? "Away"})
                         </th>
-                        <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #eee" }}>Reason</th>
-                        <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #eee" }}>
+                        <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid var(--tgem-border)" }}>Reason</th>
+                        <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid var(--tgem-border)" }}>
                           Home ({game.homeTeam ?? "Home"})
                         </th>
                       </tr>
                     </thead>
                     <tbody>
                       {reasonTable.map((row) => (
-                        <tr key={row.reason}>
-                          <td style={{ padding: 8, borderBottom: "1px solid #f0f0f0" }}>{row.away}</td>
-                          <td style={{ padding: 8, borderBottom: "1px solid #f0f0f0", fontWeight: 600 }}>{row.reason}</td>
-                          <td style={{ padding: 8, borderBottom: "1px solid #f0f0f0" }}>{row.home}</td>
+                        <tr key={row.reason} style={{ color: "var(--foreground)" }}>
+                          <td style={{ padding: 8, borderBottom: "1px solid var(--tgem-border)", color: "var(--foreground)" }}>{row.away}</td>
+                          <td style={{ padding: 8, borderBottom: "1px solid var(--tgem-border)", fontWeight: 600, color: "var(--foreground)" }}>{row.reason}</td>
+                          <td style={{ padding: 8, borderBottom: "1px solid var(--tgem-border)", color: "var(--foreground)" }}>{row.home}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               ) : (
-                <ul style={{ marginTop: 6 }}>
+                <ul style={{ marginTop: 6, color: "var(--foreground)" }}>
                   {(tgem.reasons ?? []).slice(0, 8).map((r, i) => (
                     <li key={`${i}_${r}`}>{r}</li>
                   ))}
@@ -558,19 +561,11 @@ export default function FcsMatchupPage() {
               )}
             </div>
           )}
-          <div
-            style={{
-              marginTop: 16,
-              border: "1px solid #d7e7db",
-              borderRadius: 12,
-              padding: 16,
-              background: "#f4fbf6",
-            }}
-          >
-            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6, color: "#123b22" }}>
+          <div className="tgem-cta-success" style={{ marginTop: 16, padding: 16 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
               Want to carry this lean into Pick&apos;em?
             </div>
-            <p style={{ margin: "0 0 12px 0", color: "#2b4b35", lineHeight: 1.6 }}>
+            <p className="tgem-cta-success-copy" style={{ margin: "0 0 12px 0", lineHeight: 1.6 }}>
               Jump into Pick&apos;em Mode to stack multiple TGEM matchup reads on one
               slate and make your own calls from there. The lean is a guide, not a lock.
             </p>
@@ -579,12 +574,11 @@ export default function FcsMatchupPage() {
               style={{
                 display: "inline-block",
                 borderRadius: 10,
-                background: "#15803d",
-                color: "#fff",
                 fontWeight: 700,
                 padding: "10px 14px",
                 textDecoration: "none",
               }}
+              className="tgem-cta-success-button"
             >
               Build Picks Now
             </Link>

@@ -33,20 +33,27 @@ export function LeadersBlock({
       style={{
         marginTop: 14,
         padding: 12,
-        border: "1px solid #ddd",
+        border: "1px solid var(--tgem-border)",
         borderRadius: 10,
-        background: "#fff",
+        background: "var(--tgem-surface)",
+        color: "var(--foreground)",
       }}
     >
-      <div style={{ fontWeight: 800, marginBottom: 8, color: "#111" }}>
+      <div style={{ fontWeight: 800, marginBottom: 8, color: "var(--foreground)" }}>
         Key Players / Leaders ({seasonYear})
       </div>
       {note ? (
-        <div style={{ marginBottom: 8, color: "#333", fontSize: 13 }}>{note}</div>
+        <div style={{ marginBottom: 8, color: "var(--tgem-muted-strong)", fontSize: 13 }}>
+          {note}
+        </div>
       ) : null}
 
-      {loading ? <div style={{ color: "#333" }}>Loading leaders...</div> : null}
-      {!loading && error ? <div style={{ color: "#b00020" }}>Leaders error: {error}</div> : null}
+      {loading ? (
+        <div style={{ color: "var(--tgem-muted-strong)" }}>Loading leaders...</div>
+      ) : null}
+      {!loading && error ? (
+        <div style={{ color: "#b00020" }}>Leaders error: {error}</div>
+      ) : null}
 
       {!loading && !error && availableLeaders.length > 0 ? (
         <div
@@ -54,7 +61,7 @@ export function LeadersBlock({
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
             gap: 8,
-            color: "#111",
+            color: "var(--foreground)",
           }}
         >
           {availableLeaders.map((entry) => (
@@ -69,7 +76,7 @@ export function LeadersBlock({
       ) : null}
 
       {!loading && !error && availableLeaders.length === 0 ? (
-        <div style={{ color: "#333" }}>{emptyMessage}</div>
+        <div style={{ color: "var(--tgem-muted-strong)" }}>{emptyMessage}</div>
       ) : null}
     </section>
   );
