@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { ReactNode } from "react";
 import { usePathname } from "next/navigation";
@@ -32,8 +33,25 @@ export default function SiteChrome({ children }: SiteChromeProps) {
       {!isLegalPage ? (
         <header className="border-b border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 dark:border-gray-800 dark:bg-gray-950/95 dark:supports-[backdrop-filter]:bg-gray-950/90">
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-4">
-            <Link href="/" className="text-base font-bold text-gray-900 dark:text-gray-100">
-              TGEM Sports<sup className="tgem-tm">TM</sup>
+            <Link
+              href="/"
+              className="flex items-center gap-3 rounded-full pr-3 transition hover:bg-gray-100 dark:hover:bg-gray-900"
+              aria-label="TGEM Sports home"
+            >
+              <span className="overflow-hidden rounded-2xl border border-gray-800/80 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.12),_rgba(255,255,255,0)_35%),linear-gradient(180deg,_#111827_0%,_#020617_100%)] p-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.18)]">
+                <Image
+                  src="/branding/tgem-logo.svg"
+                  alt="TGEM Sports logo"
+                  width={40}
+                  height={40}
+                  priority
+                  className="h-10 w-10 rounded-xl object-contain"
+                />
+              </span>
+              <span className="hidden text-base font-bold text-gray-900 sm:inline dark:text-gray-100">
+                TGEM Sports<sup className="tgem-tm">TM</sup>
+              </span>
+              <span className="sr-only sm:hidden">TGEM Sports</span>
             </Link>
 
             <nav aria-label="Main navigation" className="flex flex-wrap items-center justify-end gap-2">
