@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import AboutTeaser from "@/components/about/AboutTeaser";
+import TgemSportsLogo from "@/components/branding/TgemSportsLogo";
 import { getHomepageSummary } from "@/lib/homepage/summary";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -27,34 +28,42 @@ export default async function Home() {
   return (
     <main className="min-h-screen bg-gray-100 px-6 py-12 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
       <div className="mx-auto flex w-full max-w-6xl flex-col items-center">
-        <section className="w-full rounded-3xl border border-gray-200 bg-white px-8 py-14 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 sm:text-5xl">
-            TGEM Sports<sup className="tgem-tm">TM</sup>
-          </h1>
+        <section className="w-full rounded-3xl border border-gray-200 bg-white px-8 py-14 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
+            <div className="text-center lg:text-left">
+              <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 sm:text-5xl">
+                TGEM Sports<sup className="tgem-tm">TM</sup>
+              </h1>
 
-          <p className="mx-auto mt-4 max-w-2xl text-lg leading-relaxed text-gray-900 dark:text-gray-100">
-            Powered by the Tactical Game Evaluation Model
-            <sup className="tgem-tm">TM</sup> (v11.0)
-          </p>
+              <p className="mt-4 max-w-2xl text-lg leading-relaxed text-gray-900 dark:text-gray-100">
+                Powered by the Tactical Game Evaluation Model
+                <sup className="tgem-tm">TM</sup> (v11.0)
+              </p>
 
-          <p className="mx-auto mt-3 max-w-2xl text-lg leading-relaxed text-gray-900 dark:text-gray-100">
-            {summary.heroBlurb}
-          </p>
+              <p className="mt-3 max-w-2xl text-lg leading-relaxed text-gray-900 dark:text-gray-100">
+                {summary.heroBlurb}
+              </p>
 
-          <div className="mt-10 flex flex-col gap-6 sm:flex-row sm:justify-center">
-            <Link
-              href="/team-analysis"
-              className="rounded-lg bg-red-700 px-6 py-3 text-center text-base font-semibold text-white hover:bg-red-800"
-            >
-              Team Analysis
-            </Link>
+              <div className="mt-10 flex flex-col gap-6 sm:flex-row sm:justify-center lg:justify-start">
+                <Link
+                  href="/team-analysis"
+                  className="rounded-lg bg-red-700 px-6 py-3 text-center text-base font-semibold text-white hover:bg-red-800"
+                >
+                  Team Analysis
+                </Link>
 
-            <Link
-              href="/pickem"
-              className="rounded-lg bg-emerald-700 px-6 py-3 text-center text-base font-semibold text-white hover:bg-emerald-800"
-            >
-              Pick&apos;em Mode
-            </Link>
+                <Link
+                  href="/pickem"
+                  className="rounded-lg bg-emerald-700 px-6 py-3 text-center text-base font-semibold text-white hover:bg-emerald-800"
+                >
+                  Pick&apos;em Mode
+                </Link>
+              </div>
+            </div>
+
+            <div className="mx-auto w-full max-w-md">
+              <TgemSportsLogo />
+            </div>
           </div>
         </section>
 
