@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import InsightBadge from "@/components/homepage/InsightBadge";
 import AdSlot from "@/components/ui/AdSlot";
 import { LeadersBlock } from "@/components/team/LeadersBlock";
 import { FBS_TEAMS } from "@/data/fbsTeams";
+import { findRivalryLabel } from "@/data/rivalries";
 import type { TeamMeta } from "@/data/teamMeta";
 import { getTeamMeta } from "@/data/teamMeta";
 import type { LeaderEntry } from "@/lib/cfbd/leaders";
@@ -1316,6 +1318,7 @@ export default function FbsTeamPage() {
                   g.homeTeam && g.awayTeam
                     ? `${g.awayTeam} @ ${g.homeTeam}`
                     : "TBD";
+                const rivalryLabel = findRivalryLabel(g.homeTeam, g.awayTeam);
 
                 const opponentName =
                   g.homeTeam?.toLowerCase() === teamName.toLowerCase()
@@ -1377,16 +1380,19 @@ export default function FbsTeamPage() {
                     </td>
 
                     <td style={{ padding: 10, borderBottom: "1px solid #eee" }}>
-                      {matchupHref ? (
-                        <Link
-                          href={matchupHref}
-                          style={{ textDecoration: "underline" }}
-                        >
-                          {matchupText}
-                        </Link>
-                      ) : (
-                        matchupText
-                      )}
+                      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+                        {matchupHref ? (
+                          <Link
+                            href={matchupHref}
+                            style={{ textDecoration: "underline" }}
+                          >
+                            {matchupText}
+                          </Link>
+                        ) : (
+                          matchupText
+                        )}
+                        {rivalryLabel ? <InsightBadge tag="rivalry" compact /> : null}
+                      </div>
                     </td>
 
                     <td style={{ padding: 10, borderBottom: "1px solid #eee" }}>

@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import InsightBadge from "@/components/homepage/InsightBadge";
 import AdSlot from "@/components/ui/AdSlot";
 import { LeadersBlock } from "@/components/team/LeadersBlock";
+import { findRivalryLabel } from "@/data/rivalries";
 import type { LeaderEntry } from "@/lib/cfbd/leaders";
 import {
   allowPriorSeasonFallback as shouldAllowPriorSeasonFallback,
@@ -978,6 +980,7 @@ export default function FcsTeamPage() {
                 const week = g.week ?? "-";
                 const dateStr = formatDateTime(g.startDate);
                 const matchupText = g.homeTeam && g.awayTeam ? `${g.awayTeam} @ ${g.homeTeam}` : "TBD";
+                const rivalryLabel = findRivalryLabel(g.homeTeam, g.awayTeam);
                 const opponentName =
                   g.homeTeam?.toLowerCase() === teamName.toLowerCase() ? g.awayTeam : g.homeTeam;
                 const matchupHref =
@@ -1006,13 +1009,16 @@ export default function FcsTeamPage() {
                     <td style={{ padding: 10, borderBottom: "1px solid #eee" }}>{week}</td>
                     <td style={{ padding: 10, borderBottom: "1px solid #eee" }}>{dateStr}</td>
                     <td style={{ padding: 10, borderBottom: "1px solid #eee" }}>
-                      {matchupHref ? (
-                        <Link href={matchupHref} style={{ textDecoration: "underline" }}>
-                          {matchupText}
-                        </Link>
-                      ) : (
-                        matchupText
-                      )}
+                      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+                        {matchupHref ? (
+                          <Link href={matchupHref} style={{ textDecoration: "underline" }}>
+                            {matchupText}
+                          </Link>
+                        ) : (
+                          matchupText
+                        )}
+                        {rivalryLabel ? <InsightBadge tag="rivalry" compact /> : null}
+                      </div>
                     </td>
                     <td style={{ padding: 10, borderBottom: "1px solid #eee" }}>{venue}</td>
                     <td style={{ padding: 10, borderBottom: "1px solid #eee" }}>{result}</td>
