@@ -13,6 +13,7 @@ export const snapshotTtlMs = {
   schedule: 1000 * 60 * 60 * 12,
   game: 1000 * 60 * 60 * 6,
   analysis: 1000 * 60 * 30,
+  homepage: 1000 * 60 * 60 * 24 * 8,
 } as const;
 
 export function getSnapshot<T>(key: string): T | null {

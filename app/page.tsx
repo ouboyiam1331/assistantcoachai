@@ -5,7 +5,7 @@ import TgemSportsLogo from "@/components/branding/TgemSportsLogo";
 import { getHomepageSummary } from "@/lib/homepage/summary";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const summary = getHomepageSummary();
+  const summary = await getHomepageSummary();
 
   return {
     title: "TGEM Sports | College Football Picks & Analytics",
@@ -23,7 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Home() {
-  const summary = getHomepageSummary();
+  const summary = await getHomepageSummary();
 
   return (
     <main className="min-h-screen bg-gray-100 px-6 py-12 text-gray-900 dark:bg-gray-950 dark:text-gray-100">

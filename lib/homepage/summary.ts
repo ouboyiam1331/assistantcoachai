@@ -1,6 +1,11 @@
 import { cache } from "react";
-import { getSnapshot, listSnapshots, setSnapshot, snapshotTtlMs } from "@/lib/snapshots/store";
 import { findRivalryLabel } from "@/data/rivalries";
+import { FBS_TEAMS } from "@/data/fbsTeams";
+import { getDefaultCfbSeasonYear } from "@/lib/cfbd/season";
+import { cfbdGetJson } from "@/lib/cfbd/http";
+import { resolvePickemTeamIdentity } from "@/lib/pickem/teamSlug";
+import { getSnapshot, listSnapshots, setSnapshot, snapshotTtlMs } from "@/lib/snapshots/store";
+import { analyzeMatchupSeasonOnly } from "@/lib/tgem/v10";
 
 type TeamPayload = {
   team?: string;
@@ -31,12 +36,32 @@ type MatchupPayload = {
   game?: {
     homeTeam?: string | null;
     awayTeam?: string | null;
+    neutralSite?: boolean | null;
   } | null;
   tgem?: {
     lean?: string | null;
     confidence?: number | null;
     reasons?: string[];
   } | null;
+};
+
+type WeeklySlateGame = {
+  league: "FBS" | "FCS";
+  id?: number | string | null;
+  week?: number | null;
+  seasonType?: string | null;
+  startDate?: string | null;
+  homeTeam?: string | null;
+  awayTeam?: string | null;
+  neutralSite?: boolean | null;
+};
+
+type WeeklySlateContext = {
+  seasonYear: number;
+  week: number;
+  seasonType: "regular" | "championship" | "postseason";
+  refreshKey: string;
+  games: WeeklySlateGame[];
 };
 
 export type HomepageInsight = {
@@ -53,6 +78,7 @@ export type HomepageSummary = {
 };
 
 const HOMEPAGE_SUMMARY_KEY = "homepage_summary";
+const FBS_POWER_CONFERENCES = new Set(["SEC", "Big Ten", "Big 12", "ACC"]);
 
 function asNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -300,7 +326,7 @@ function buildTeamInsight(rows: Array<{ payload: TeamPayload }>) {
   } satisfies HomepageInsight;
 }
 
-function computeHomepageSummary(): HomepageSummary {
+function computeCachedTrafficSummary(): HomepageSummary {
   const cached = getSnapshot<HomepageSummary>(HOMEPAGE_SUMMARY_KEY);
   if (cached) return cached;
 
@@ -354,7 +380,7 @@ function computeHomepageSummary(): HomepageSummary {
       uniqueTeams.size > 0 || strongMatchupCount > 0
         ? `TGEM Sports is currently serving cached college football analysis across ${uniqueTeams.size || "multiple"} team dashboards and ${strongMatchupCount || "live"} higher-confidence matchup reads, with other sports coming soon.`
         : "Advanced college football analytics, matchup projections, and confidence-weighted insights for college football, with other sports coming soon.",
-    seoHeading: `College Football Pick'em Predictions, Team Analysis & Cached Matchup Insights`,
+    seoHeading: "College Football Pick'em Predictions, Team Analysis & Cached Matchup Insights",
     seoDescription:
       uniqueTeams.size > 0 || strongMatchupCount > 0
         ? `TGEM Sports surfaces college football predictions, matchup analysis, and pick'em insights from cached normalized payloads across ${uniqueTeams.size || "multiple"} team dashboards and ${strongMatchupCount || "live"} stronger matchup reads.`
@@ -364,6 +390,376 @@ function computeHomepageSummary(): HomepageSummary {
 
   setSnapshot(HOMEPAGE_SUMMARY_KEY, summary, snapshotTtlMs.analysis);
   return summary;
+}
+
+function isRoughCfbWindow(now = new Date()) {
+  const month = now.getMonth();
+  return month >= 7 || month === 0;
+}
+
+function normalizeWeeklySeasonType(raw: string | null | undefined) {
+  const value = String(raw ?? "").toLowerCase();
+  if (
+    value.includes("playoff") ||
+    value.includes("cfp") ||
+    value.includes("quarterfinal") ||
+    value.includes("semifinal") ||
+    value.includes("national championship") ||
+    value.includes("bowl") ||
+    value.includes("post")
+  ) {
+    return "postseason" as const;
+  }
+  return "regular" as const;
+}
+
+function getPhaseForGame(game: WeeklySlateGame): "regular" | "championship" | "bowl" | "cfp" {
+  const seasonType = String(game.seasonType ?? "").toLowerCase();
+  if (
+    seasonType.includes("playoff") ||
+    seasonType.includes("cfp") ||
+    seasonType.includes("quarterfinal") ||
+    seasonType.includes("semifinal") ||
+    seasonType.includes("national championship")
+  ) {
+    return "cfp";
+  }
+  if (seasonType.includes("post") || seasonType.includes("bowl")) return "bowl";
+  if (typeof game.week === "number" && game.week >= 14) return "championship";
+  return "regular";
+}
+
+function gameDateMs(game: WeeklySlateGame) {
+  return Date.parse(String(game.startDate ?? "")) || Number.POSITIVE_INFINITY;
+}
+
+async function fetchCurrentWeeklySlateContext(now = new Date()): Promise<WeeklySlateContext | null> {
+  if (!isRoughCfbWindow(now)) return null;
+
+  const seasonYear = getDefaultCfbSeasonYear(now);
+  const [fbsRows, fcsRows] = await Promise.all([
+    cfbdGetJson<unknown>(
+      "/games",
+      { year: seasonYear, classification: "fbs", seasonType: "both" },
+      {
+        cacheTtlMs: 1000 * 60 * 60 * 6,
+        dedupeMs: 60_000,
+        team: "homepage-prewarm-fbs",
+        mockFactory: () => [],
+      },
+    ),
+    cfbdGetJson<unknown>(
+      "/games",
+      { year: seasonYear, classification: "fcs", seasonType: "both" },
+      {
+        cacheTtlMs: 1000 * 60 * 60 * 6,
+        dedupeMs: 60_000,
+        team: "homepage-prewarm-fcs",
+        mockFactory: () => [],
+      },
+    ),
+  ]);
+
+  const games = [
+    ...((Array.isArray(fbsRows) ? fbsRows : []) as Record<string, unknown>[]).map((game) => ({
+      league: "FBS" as const,
+      game,
+    })),
+    ...((Array.isArray(fcsRows) ? fcsRows : []) as Record<string, unknown>[]).map((game) => ({
+      league: "FCS" as const,
+      game,
+    })),
+  ];
+  if (games.length === 0) return null;
+
+  const slateGames = games
+    .map(({ league, game }) => ({
+      league,
+      id:
+        typeof game.id === "number"
+          ? game.id
+          : Number.isFinite(Number(game.id))
+            ? Number(game.id)
+            : null,
+      week: typeof game.week === "number" ? game.week : null,
+      seasonType: typeof game.seasonType === "string" ? game.seasonType : null,
+      startDate: typeof game.startDate === "string" ? game.startDate : null,
+      homeTeam: typeof game.homeTeam === "string" ? game.homeTeam : null,
+      awayTeam: typeof game.awayTeam === "string" ? game.awayTeam : null,
+      neutralSite: typeof game.neutralSite === "boolean" ? game.neutralSite : null,
+    }))
+    .filter((game) => game.week != null && game.homeTeam && game.awayTeam && game.startDate);
+
+  const firstScheduledKickoffMs = slateGames.reduce((earliest, game) => {
+    const ts = gameDateMs(game);
+    return Number.isFinite(ts) ? Math.min(earliest, ts) : earliest;
+  }, Number.POSITIVE_INFINITY);
+
+  if (!Number.isFinite(firstScheduledKickoffMs)) return null;
+
+  const prewarmStartMs = firstScheduledKickoffMs - 1000 * 60 * 60 * 24 * 7;
+  if (now.getTime() < prewarmStartMs) return null;
+
+  const threshold = now.getTime() - 1000 * 60 * 60 * 36;
+  const upcoming = slateGames
+    .filter((game) => gameDateMs(game) >= threshold)
+    .sort((a, b) => gameDateMs(a) - gameDateMs(b));
+
+  const pivot = upcoming[0];
+  if (!pivot || typeof pivot.week !== "number") return null;
+
+  const seasonType = normalizeWeeklySeasonType(pivot.seasonType);
+  const week = pivot.week;
+  const weekGames = upcoming.filter(
+    (game) =>
+      game.week === week && normalizeWeeklySeasonType(game.seasonType) === seasonType,
+  );
+
+  if (weekGames.length === 0) return null;
+
+  return {
+    seasonYear,
+    week,
+    seasonType,
+    refreshKey: `${seasonYear}:${seasonType}:${week}`,
+    games: weekGames,
+  };
+}
+
+function getConferenceByTeamName(teamName: string | null | undefined) {
+  const normalized = normalizeName(String(teamName ?? ""));
+  const found = FBS_TEAMS.find((team) => normalizeName(team.name) === normalized);
+  return found?.conference ?? null;
+}
+
+function marqueeScore(game: WeeklySlateGame) {
+  const rivalryLabel = findRivalryLabel(game.homeTeam, game.awayTeam);
+  const homeConference = getConferenceByTeamName(game.homeTeam);
+  const awayConference = getConferenceByTeamName(game.awayTeam);
+  const bothPower =
+    homeConference != null &&
+    awayConference != null &&
+    FBS_POWER_CONFERENCES.has(homeConference) &&
+    FBS_POWER_CONFERENCES.has(awayConference);
+
+  let score = 0;
+  if (game.league === "FBS") score += 25;
+  if (rivalryLabel) score += 100;
+  if (bothPower) score += 40;
+  if (homeConference === "Independents" || awayConference === "Independents") score += 18;
+  if (game.neutralSite) score += 10;
+  if (typeof game.week === "number" && game.week >= 14) score += 35;
+  return score;
+}
+
+function selectWeeklyAnalysisCandidates(games: WeeklySlateGame[]) {
+  const byPriority = (a: WeeklySlateGame, b: WeeklySlateGame) =>
+    marqueeScore(b) - marqueeScore(a) || gameDateMs(a) - gameDateMs(b);
+
+  const fbs = games.filter((game) => game.league === "FBS").sort(byPriority).slice(0, 6);
+  const fcs = games.filter((game) => game.league === "FCS").sort(byPriority).slice(0, 4);
+
+  return [...fbs, ...fcs].sort((a, b) => gameDateMs(a) - gameDateMs(b));
+}
+
+function buildWeeklyInsightRows(rows: MatchupPayload[]) {
+  const withConfidence = rows
+    .map((payload) => ({
+      payload,
+      confidence: asNumber(payload.tgem?.confidence) ?? 0,
+    }))
+    .filter((row) => row.confidence > 0)
+    .sort((a, b) => b.confidence - a.confidence);
+
+  if (withConfidence.length === 0) {
+    return [
+      {
+        title: "This Week's TGEM Slate Is Warming Up",
+        detail:
+          "TGEM has not produced enough weekly matchup reads yet, so the homepage is waiting for Monday's prewarm cycle or the first matchup requests of the week.",
+        href: "/team-analysis",
+      },
+    ] satisfies HomepageInsight[];
+  }
+
+  const strongest = withConfidence[0];
+  const rivalry = withConfidence.find((row) =>
+    findRivalryLabel(row.payload.game?.homeTeam, row.payload.game?.awayTeam),
+  );
+  const hotMatchup = withConfidence.find(
+    (row) =>
+      row !== strongest &&
+      row.confidence >= 58 &&
+      row.confidence <= 72 &&
+      String(row.payload.effectivePhase ?? "").toLowerCase() === "regular",
+  );
+  const coinFlip = [...withConfidence].sort(
+    (a, b) => Math.abs(a.confidence - 50) - Math.abs(b.confidence - 50),
+  )[0];
+  const upsetAlert = withConfidence.find(
+    (row) => row.payload.tgem?.lean === "AWAY" && row.confidence >= 60,
+  );
+
+  const insights: HomepageInsight[] = [];
+
+  if (strongest) {
+    const label = findRivalryLabel(
+      strongest.payload.game?.homeTeam,
+      strongest.payload.game?.awayTeam,
+    );
+    insights.push({
+      title: `This Week's Top ${String(strongest.payload.league ?? "FBS")} Matchup: ${strongest.payload.game?.awayTeam} at ${strongest.payload.game?.homeTeam}`,
+      detail: `${favoredTeam(strongest.payload)} owns TGEM's strongest early weekly ${String(strongest.payload.league ?? "FBS")} read at ${strongest.confidence}/100 confidence.${label ? ` ${label} gives the game a built-in rivalry edge on top of the model score.` : ""}`,
+      href: matchupHref(strongest.payload),
+    });
+  }
+
+  if (hotMatchup) {
+    insights.push({
+      title: `${String(hotMatchup.payload.league ?? "FBS")} Hot Matchup: ${hotMatchup.payload.game?.awayTeam} at ${hotMatchup.payload.game?.homeTeam}`,
+      detail: `TGEM has this ${String(hotMatchup.payload.league ?? "FBS")} game in the live-action middle band at ${hotMatchup.confidence}/100 confidence, which usually means it has enough edge to matter without reading like a runaway favorite.`,
+      href: matchupHref(hotMatchup.payload),
+    });
+  }
+
+  if (upsetAlert) {
+    insights.push({
+      title: `${String(upsetAlert.payload.league ?? "FBS")} Upset Alert: ${upsetAlert.payload.game?.awayTeam} at ${upsetAlert.payload.game?.homeTeam}`,
+      detail: `TGEM is leaning toward the road side here at ${upsetAlert.confidence}/100 confidence, making this one of the more interesting weekly ${String(upsetAlert.payload.league ?? "FBS")} spots where the visitor may have the cleaner path.`,
+      href: matchupHref(upsetAlert.payload),
+    });
+  }
+
+  if (coinFlip) {
+    insights.push({
+      title: `${String(coinFlip.payload.league ?? "FBS")} Coin Flip Alert: ${coinFlip.payload.game?.awayTeam} at ${coinFlip.payload.game?.homeTeam}`,
+      detail: `This matchup is sitting closest to true volatility in TGEM's weekly ${String(coinFlip.payload.league ?? "FBS")} slate, so possessions, field position, and late-game execution matter more than a clean favorite profile.`,
+      href: matchupHref(coinFlip.payload),
+    });
+  }
+
+  if (rivalry) {
+    const label = findRivalryLabel(rivalry.payload.game?.homeTeam, rivalry.payload.game?.awayTeam);
+    insights.push({
+      title: `Rivalry Watch: ${label ?? `${rivalry.payload.game?.awayTeam} at ${rivalry.payload.game?.homeTeam}`}`,
+      detail: `TGEM has this rivalry in the weekly slate already, giving the homepage a direct model read on one of the tension-heavy spots people naturally look for first.`,
+      href: matchupHref(rivalry.payload),
+    });
+  }
+
+  return insights
+    .filter(
+      (insight, index, all) =>
+        all.findIndex((candidate) => candidate.href === insight.href) === index,
+    )
+    .slice(0, 3);
+}
+
+function buildWeeklySummary(context: WeeklySlateContext, rows: MatchupPayload[]): HomepageSummary {
+  const highConfidenceCount = rows.filter(
+    (row) => (asNumber(row.tgem?.confidence) ?? 0) >= 65,
+  ).length;
+  const fbsCount = rows.filter((row) => row.league === "FBS").length;
+  const fcsCount = rows.filter((row) => row.league === "FCS").length;
+  const insights = buildWeeklyInsightRows(rows);
+
+  return {
+    heroBlurb: `TGEM Sports is tracking Week ${context.week} with Monday-refreshed TGEM matchup reads across ${fbsCount} FBS and ${fcsCount} FCS spotlight games, surfacing ${highConfidenceCount} higher-confidence spots from a capped weekly slate to keep API usage lean.`,
+    seoHeading: `Week ${context.week} College Football Pick'em Insights & TGEM Matchup Reads`,
+    seoDescription: `TGEM Sports is surfacing Monday-refreshed Week ${context.week} FBS and FCS matchup insights, including top matchups, hot reads, coin-flip alerts, and upset-watch spots selected from TGEM's weekly analysis.`,
+    insights,
+  };
+}
+
+export async function refreshHomepageSummaryFromWeeklySlate() {
+  const context = await fetchCurrentWeeklySlateContext();
+  if (!context) return null;
+
+  const weeklyKey = `homepage_weekly_summary:${context.refreshKey}`;
+  const cached = getSnapshot<HomepageSummary>(weeklyKey);
+  if (cached) {
+    setSnapshot(HOMEPAGE_SUMMARY_KEY, cached, snapshotTtlMs.homepage);
+    return {
+      refreshKey: context.refreshKey,
+      seasonYear: context.seasonYear,
+      week: context.week,
+      seasonType: context.seasonType,
+      analyzedGames: 0,
+      summary: cached,
+      cacheHit: true,
+    };
+  }
+
+  const selectedGames = selectWeeklyAnalysisCandidates(context.games);
+  const rows: MatchupPayload[] = [];
+
+  for (const game of selectedGames) {
+    const homeIdentity = resolvePickemTeamIdentity(game.homeTeam);
+    const awayIdentity = resolvePickemTeamIdentity(game.awayTeam);
+    if (!homeIdentity.token || !awayIdentity.token) {
+      continue;
+    }
+
+    const phase = getPhaseForGame(game);
+    const tgem = await analyzeMatchupSeasonOnly({
+      team: homeIdentity.token,
+      opponent: awayIdentity.token,
+      year: context.seasonYear,
+      venue: game.neutralSite ? "neutral" : "home",
+      phase,
+      week: context.week,
+      seasonType: game.seasonType ?? undefined,
+      lightweight: true,
+    });
+
+    const payload: MatchupPayload = {
+      gameId: String(game.id ?? ""),
+      league: game.league,
+      effectivePhase: phase,
+      game: {
+        homeTeam: game.homeTeam ?? null,
+        awayTeam: game.awayTeam ?? null,
+        neutralSite: game.neutralSite ?? null,
+      },
+      tgem: {
+        lean: tgem.lean,
+        confidence: tgem.confidence,
+        reasons: tgem.reasons,
+      },
+    };
+
+    rows.push(payload);
+    setSnapshot(
+      `matchup_page_payload:prewarm:${game.league}:${context.refreshKey}:${String(game.id ?? "")}`,
+      payload,
+      snapshotTtlMs.homepage,
+    );
+  }
+
+  const summary = buildWeeklySummary(context, rows);
+  setSnapshot(weeklyKey, summary, snapshotTtlMs.homepage);
+  setSnapshot(HOMEPAGE_SUMMARY_KEY, summary, snapshotTtlMs.homepage);
+
+  return {
+    refreshKey: context.refreshKey,
+    seasonYear: context.seasonYear,
+    week: context.week,
+    seasonType: context.seasonType,
+    analyzedGames: rows.length,
+    summary,
+    cacheHit: false,
+  };
+}
+
+async function computeHomepageSummary() {
+  try {
+    const weekly = await refreshHomepageSummaryFromWeeklySlate();
+    if (weekly?.summary) return weekly.summary;
+  } catch {
+    // Fall through to cached-traffic summary if weekly refresh fails.
+  }
+
+  return computeCachedTrafficSummary();
 }
 
 export const getHomepageSummary = cache(computeHomepageSummary);

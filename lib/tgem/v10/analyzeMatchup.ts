@@ -11,6 +11,7 @@ export type AnalyzeMatchupInput = {
   phase?: TGEMPhaseInput;
   week?: number;
   seasonType?: string;
+  lightweight?: boolean;
 };
 
 type SeasonStats = {
@@ -934,6 +935,7 @@ export async function analyzeMatchupSeasonOnly(
   input: AnalyzeMatchupInput,
 ): Promise<AnalyzeMatchupOutput> {
   const { team, opponent, year, venue } = input;
+  const lightweight = input.lightweight === true;
   const phase = classifyTgemPhase(input);
 
   if (!Number.isFinite(year)) {
@@ -1005,10 +1007,15 @@ export async function analyzeMatchupSeasonOnly(
   const teamRating = computeTeamRating(teamStats);
   const opponentRating = computeTeamRating(oppStats);
   const ratingDelta = teamRating - opponentRating;
-  const [teamAvailability, oppAvailability] = await Promise.all([
-    computeAvailabilityRisk(team, yearUsed),
-    computeAvailabilityRisk(opponent, yearUsed),
-  ]);
+  const [teamAvailability, oppAvailability] = lightweight
+    ? [
+        { risk: 0, flags: [] as string[] },
+        { risk: 0, flags: [] as string[] },
+      ]
+    : await Promise.all([
+        computeAvailabilityRisk(team, yearUsed),
+        computeAvailabilityRisk(opponent, yearUsed),
+      ]);
   const combinedAvailabilityRisk = Math.max(
     teamAvailability.risk,
     oppAvailability.risk,
@@ -1085,14 +1092,18 @@ export async function analyzeMatchupSeasonOnly(
   reasons.push(
     `TGEM rating: ${team} ${teamRating} vs ${opponent} ${opponentRating} (delta ${ratingDelta >= 0 ? "+" : ""}${ratingDelta})`,
   );
-  reasons.push(
-    `Availability risk (proxy): ${team} ${teamAvailability.risk.toFixed(1)} / ${opponent} ${oppAvailability.risk.toFixed(1)} (confidence penalty ${availabilityPenalty})`,
-  );
-  for (const f of teamAvailability.flags) {
-    reasons.push(`Availability flag ${team}: ${f}`);
-  }
-  for (const f of oppAvailability.flags) {
-    reasons.push(`Availability flag ${opponent}: ${f}`);
+  if (lightweight) {
+    reasons.push("Availability risk skipped for homepage prewarm mode to minimize API usage.");
+  } else {
+    reasons.push(
+      `Availability risk (proxy): ${team} ${teamAvailability.risk.toFixed(1)} / ${opponent} ${oppAvailability.risk.toFixed(1)} (confidence penalty ${availabilityPenalty})`,
+    );
+    for (const f of teamAvailability.flags) {
+      reasons.push(`Availability flag ${team}: ${f}`);
+    }
+    for (const f of oppAvailability.flags) {
+      reasons.push(`Availability flag ${opponent}: ${f}`);
+    }
   }
   reasons.push(`Feature coverage: ${usedFactors}/${totalFactors} factors used`);
   if (eliminationBuckets) {
