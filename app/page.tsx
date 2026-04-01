@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import AboutTeaser from "@/components/about/AboutTeaser";
 import TgemSportsLogo from "@/components/branding/TgemSportsLogo";
+import InsightBadge from "@/components/homepage/InsightBadge";
 import { getHomepageSummary } from "@/lib/homepage/summary";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -91,6 +92,11 @@ export default async function Home() {
                 key={insight.title}
                 className="rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-gray-800 dark:bg-gray-950/60"
               >
+                {insight.tag ? (
+                  <div className="mb-3">
+                    <InsightBadge tag={insight.tag} />
+                  </div>
+                ) : null}
                 <Link
                   href={insight.href}
                   className="font-semibold text-gray-900 hover:underline dark:text-gray-100"

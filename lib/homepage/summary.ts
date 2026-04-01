@@ -65,10 +65,18 @@ type WeeklySlateContext = {
 };
 
 export type HomepageInsight = {
+  tag?: HomepageInsightTag;
   title: string;
   detail: string;
   href: string;
 };
+
+export type HomepageInsightTag =
+  | "top_matchup"
+  | "rivalry"
+  | "hot_matchup"
+  | "upset_alert"
+  | "coin_flip";
 
 export type HomepageSummary = {
   heroBlurb: string;
@@ -234,6 +242,7 @@ function buildMatchupInsights(
   if (rivalry) {
     const label = findRivalryLabel(rivalry.payload.game?.homeTeam, rivalry.payload.game?.awayTeam);
     insights.push({
+      tag: "rivalry",
       title: `Key Rivalry Game: ${label ?? `${rivalry.payload.game?.awayTeam} at ${rivalry.payload.game?.homeTeam}`}`,
       detail: `${rivalry.payload.game?.awayTeam} at ${rivalry.payload.game?.homeTeam} is sitting in cache as a rivalry-week read, giving TGEM a live shot to frame one of college football's more familiar tension spots without a fresh API pull.`,
       href: matchupHref(rivalry.payload),
@@ -275,6 +284,7 @@ function buildMatchupInsights(
 
   if (hotMatchup) {
     insights.push({
+      tag: "hot_matchup",
       title: `Hot Matchup: ${hotMatchup.payload.game?.awayTeam} at ${hotMatchup.payload.game?.homeTeam}`,
       detail: `This one is landing in the competitive middle tier of the current cache, which usually means the matchup has enough edge to matter without reading like a runaway favorite.`,
       href: matchupHref(hotMatchup.payload),
@@ -283,6 +293,7 @@ function buildMatchupInsights(
 
   if (closest) {
     insights.push({
+      tag: "upset_alert",
       title: `Upset Watch: ${closest.payload.game?.awayTeam} at ${closest.payload.game?.homeTeam}`,
       detail: `This matchup is one of the tighter cached reads, which usually means volatility, swing possessions, and late-game leverage matter more than a clean favorite profile.`,
       href: matchupHref(closest.payload),
@@ -608,6 +619,7 @@ function buildWeeklyInsightRows(rows: MatchupPayload[]) {
       strongest.payload.game?.awayTeam,
     );
     insights.push({
+      tag: "top_matchup",
       title: `This Week's Top ${String(strongest.payload.league ?? "FBS")} Matchup: ${strongest.payload.game?.awayTeam} at ${strongest.payload.game?.homeTeam}`,
       detail: `${favoredTeam(strongest.payload)} owns TGEM's strongest early weekly ${String(strongest.payload.league ?? "FBS")} read at ${strongest.confidence}/100 confidence.${label ? ` ${label} gives the game a built-in rivalry edge on top of the model score.` : ""}`,
       href: matchupHref(strongest.payload),
@@ -616,6 +628,7 @@ function buildWeeklyInsightRows(rows: MatchupPayload[]) {
 
   if (hotMatchup) {
     insights.push({
+      tag: "hot_matchup",
       title: `${String(hotMatchup.payload.league ?? "FBS")} Hot Matchup: ${hotMatchup.payload.game?.awayTeam} at ${hotMatchup.payload.game?.homeTeam}`,
       detail: `TGEM has this ${String(hotMatchup.payload.league ?? "FBS")} game in the live-action middle band at ${hotMatchup.confidence}/100 confidence, which usually means it has enough edge to matter without reading like a runaway favorite.`,
       href: matchupHref(hotMatchup.payload),
@@ -624,6 +637,7 @@ function buildWeeklyInsightRows(rows: MatchupPayload[]) {
 
   if (upsetAlert) {
     insights.push({
+      tag: "upset_alert",
       title: `${String(upsetAlert.payload.league ?? "FBS")} Upset Alert: ${upsetAlert.payload.game?.awayTeam} at ${upsetAlert.payload.game?.homeTeam}`,
       detail: `TGEM is leaning toward the road side here at ${upsetAlert.confidence}/100 confidence, making this one of the more interesting weekly ${String(upsetAlert.payload.league ?? "FBS")} spots where the visitor may have the cleaner path.`,
       href: matchupHref(upsetAlert.payload),
@@ -632,6 +646,7 @@ function buildWeeklyInsightRows(rows: MatchupPayload[]) {
 
   if (coinFlip) {
     insights.push({
+      tag: "coin_flip",
       title: `${String(coinFlip.payload.league ?? "FBS")} Coin Flip Alert: ${coinFlip.payload.game?.awayTeam} at ${coinFlip.payload.game?.homeTeam}`,
       detail: `This matchup is sitting closest to true volatility in TGEM's weekly ${String(coinFlip.payload.league ?? "FBS")} slate, so possessions, field position, and late-game execution matter more than a clean favorite profile.`,
       href: matchupHref(coinFlip.payload),
@@ -641,6 +656,7 @@ function buildWeeklyInsightRows(rows: MatchupPayload[]) {
   if (rivalry) {
     const label = findRivalryLabel(rivalry.payload.game?.homeTeam, rivalry.payload.game?.awayTeam);
     insights.push({
+      tag: "rivalry",
       title: `Rivalry Watch: ${label ?? `${rivalry.payload.game?.awayTeam} at ${rivalry.payload.game?.homeTeam}`}`,
       detail: `TGEM has this rivalry in the weekly slate already, giving the homepage a direct model read on one of the tension-heavy spots people naturally look for first.`,
       href: matchupHref(rivalry.payload),
