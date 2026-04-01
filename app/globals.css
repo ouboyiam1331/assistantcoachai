@@ -356,8 +356,11 @@ button {
   border-color: var(--tgem-border);
 }
 
-.tgem-color-swatch {
+.tgem-shell .tgem-color-swatch,
+.tgem-shell .tgem-color-swatch[style*="background"],
+.tgem-shell .tgem-color-swatch[style*="backgroundColor"] {
   background: var(--swatch-color) !important;
   background-color: var(--swatch-color) !important;
   border-color: var(--tgem-border) !important;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
 }
