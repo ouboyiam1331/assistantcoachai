@@ -501,6 +501,7 @@ export default function FcsTeamPage() {
   const [leaders, setLeaders] = useState<LeaderEntry[] | null>(null);
   const [leadersYear, setLeadersYear] = useState<number>(statsRequestYear);
   const [scheduleSeasonYear, setScheduleSeasonYear] = useState<number>(scheduleRequestYear);
+  const [showExtendedSeasonTotals, setShowExtendedSeasonTotals] = useState(false);
   const [leadersLoading, setLeadersLoading] = useState(false);
   const [leadersError, setLeadersError] = useState<string | null>(null);
   const teamName = meta?.name ?? slug;
@@ -885,16 +886,40 @@ export default function FcsTeamPage() {
         {seasonTotals && Object.keys(seasonTotals).length > 0 ? (
           <div style={{ marginTop: 12 }}>
             <hr style={{ margin: "10px 0" }} />
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>Extended Season Totals (CFBD)</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, color: LEGACY_UI.text }}>
-              {Object.entries(seasonTotals)
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([k, v]) => (
-                  <div key={k}>
-                    <strong>{prettyStatName(k)}:</strong> {fmt(v)}
-                  </div>
-                ))}
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowExtendedSeasonTotals((current) => !current)}
+              style={{
+                appearance: "none",
+                background: LEGACY_UI.subtle,
+                border: `1px solid ${LEGACY_UI.border}`,
+                borderRadius: 10,
+                color: LEGACY_UI.text,
+                cursor: "pointer",
+                fontSize: 14,
+                fontWeight: 700,
+                marginBottom: showExtendedSeasonTotals ? 10 : 0,
+                padding: "8px 12px",
+              }}
+            >
+              {showExtendedSeasonTotals
+                ? "Hide extended season totals"
+                : "Click here to see more"}
+            </button>
+            {showExtendedSeasonTotals ? (
+              <>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>Extended Season Totals (CFBD)</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, color: LEGACY_UI.text }}>
+                  {Object.entries(seasonTotals)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([k, v]) => (
+                      <div key={k}>
+                        <strong>{prettyStatName(k)}:</strong> {fmt(v)}
+                      </div>
+                    ))}
+                </div>
+              </>
+            ) : null}
           </div>
         ) : null}
         {!seasonStatsNote && !showPendingSeasonStatsMessage ? (
