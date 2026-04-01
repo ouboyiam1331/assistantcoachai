@@ -69,12 +69,6 @@ export default function FcsByConferencePage() {
     [teamsByConference],
   );
 
-  useEffect(() => {
-    if (!openConference && conferences.length > 0) {
-      setOpenConference(conferences[0]);
-    }
-  }, [conferences, openConference]);
-
   return (
     <main className="tgem-page px-6 py-12">
       <div className="mx-auto max-w-5xl">
