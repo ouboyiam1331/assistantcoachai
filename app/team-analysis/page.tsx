@@ -22,8 +22,8 @@ export default function TeamAnalysisHomePage() {
             Team Analysis - TGEM Sports
           </h1>
           <p className="mt-3 text-lg leading-relaxed text-gray-700 dark:text-gray-300">
-            Explore TGEM-powered analysis by league and team. League availability,
-            routes, and readiness are driven from centralized league config.
+            Explore TGEM-powered analysis by league and team. Compare programs,
+            study schedules, and open matchup pages to find the strongest weekly edges.
           </p>
           <p className="mt-2 text-gray-700 dark:text-gray-300">Choose a path below to begin.</p>
         </header>
