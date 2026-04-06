@@ -8,9 +8,9 @@ import AboutOrigin from "@/components/about/AboutOrigin";
 import AboutWhatTGEMDoes from "@/components/about/AboutWhatTGEMDoes";
 
 export const metadata: Metadata = {
-  title: "About TGEM Sports | Veteran-Owned Sports Analytics Platform",
+  title: "About TGEM Sports | U.S. Army Veteran-Owned Sports Analytics Platform",
   description:
-    "Learn the story behind TGEM Sports, a veteran-owned platform built to deliver smarter football analysis, matchup reads, and pick'em insights.",
+    "Learn the story behind TGEM Sports, a U.S. Army veteran-owned platform built to deliver smarter football analysis, matchup reads, and pick'em insights.",
 };
 
 export default function AboutPage() {

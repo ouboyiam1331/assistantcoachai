@@ -1,5 +1,5 @@
 const trustMarkers = [
-  "Veteran-Owned",
+  "U.S. Army Veteran-Owned",
   "Computer Science Degree",
   "Built from Real Pick'em Experience",
 ];
@@ -14,9 +14,9 @@ export default function AboutFounder() {
         Built with football passion, technical skill, and a competitive mindset
       </h2>
       <p className="mt-5 max-w-3xl text-base leading-8 text-gray-700 dark:text-gray-300">
-        TGEM Sports is a veteran-owned platform built by a Troy University graduate
-        with a degree in computer science and a passion for football, competition,
-        and analysis.
+        TGEM Sports is a U.S. Army veteran-owned platform built by a Troy University
+        graduate with a degree in computer science and a passion for football,
+        competition, and analysis.
       </p>
 
       <div className="mt-8 grid gap-4 md:grid-cols-3">

@@ -20,9 +20,9 @@ export default function AboutTeaser() {
           <p className="mt-4 max-w-3xl text-base leading-8 text-gray-700 dark:text-gray-300">
             TGEM Sports was created during the 2025 college football season to turn
             weekly pick&apos;em guesses into structured, data-driven decisions. Built by
-            a veteran and Troy University computer science graduate, TGEM blends
-            football passion, analytics, and real-game context into a smarter way to
-            read the week.
+            a U.S. Army veteran and Troy University computer science graduate, TGEM
+            blends football passion, analytics, and real-game context into a smarter
+            way to read the week.
           </p>
 
           <div className="mt-8 flex flex-col gap-4 sm:flex-row">

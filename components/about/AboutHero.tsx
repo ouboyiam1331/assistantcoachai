@@ -20,7 +20,7 @@ export default function AboutHero() {
     <section className="grid gap-8 lg:grid-cols-[1.3fr_0.9fr] lg:items-center">
       <div className="rounded-3xl border border-gray-200 bg-white px-8 py-10 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-red-700 dark:text-red-400">
-          Veteran-Owned Sports Analytics Platform
+          U.S. Army Veteran-Owned Sports Analytics Platform
         </p>
         <h1 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-5xl">
           Built to give everyday fans a smarter edge
