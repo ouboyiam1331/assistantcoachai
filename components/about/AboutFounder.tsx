@@ -14,9 +14,10 @@ export default function AboutFounder() {
         Built with football passion, technical skill, and a competitive mindset
       </h2>
       <p className="mt-5 max-w-3xl text-base leading-8 text-gray-700 dark:text-gray-300">
-        TGEM Sports is a U.S. Army veteran-owned platform built by a Troy University
-        graduate with a degree in computer science and a passion for football,
-        competition, and analysis.
+        TGEM Sports was built by a U.S. Army veteran who graduated from Troy
+        University with a Computer Science degree and a passion for football,
+        competition, and analysis. The model was shaped through live game updates,
+        in-game reads, and real competitive experience.
       </p>
 
       <div className="mt-8 grid gap-4 md:grid-cols-3">
