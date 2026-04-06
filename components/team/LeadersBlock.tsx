@@ -29,44 +29,33 @@ export function LeadersBlock({
   );
 
   return (
-    <section
-      style={{
-        marginTop: 14,
-        padding: 12,
-        border: "1px solid var(--tgem-border)",
-        borderRadius: 10,
-        background: "var(--tgem-surface)",
-        color: "var(--foreground)",
-      }}
-    >
-      <div style={{ fontWeight: 800, marginBottom: 8, color: "var(--foreground)" }}>
+    <section className="tgem-surface mt-4 rounded-3xl p-6 text-gray-900 dark:text-gray-100">
+      <div className="mb-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
         Key Players / Leaders ({seasonYear})
       </div>
       {note ? (
-        <div style={{ marginBottom: 8, color: "var(--tgem-muted-strong)", fontSize: 13 }}>
+        <div className="mb-3 text-sm text-gray-700 dark:text-gray-300">
           {note}
         </div>
       ) : null}
 
       {loading ? (
-        <div style={{ color: "var(--tgem-muted-strong)" }}>Loading leaders...</div>
+        <div className="text-sm text-gray-700 dark:text-gray-300">Loading leaders...</div>
       ) : null}
       {!loading && error ? (
-        <div style={{ color: "#b00020" }}>Leaders error: {error}</div>
+        <div className="text-sm text-red-700 dark:text-red-300">Leaders error: {error}</div>
       ) : null}
 
       {!loading && !error && availableLeaders.length > 0 ? (
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 8,
-            color: "var(--foreground)",
-          }}
+          className="grid gap-3 text-sm text-gray-700 sm:grid-cols-2 dark:text-gray-300"
         >
           {availableLeaders.map((entry) => (
-            <div key={entry.key}>
-              <strong>{entry.label}:</strong>{" "}
+            <div
+              key={entry.key}
+              className="tgem-surface-subtle rounded-2xl px-4 py-3"
+            >
+              <strong className="text-gray-900 dark:text-gray-100">{entry.label}:</strong>{" "}
               {entry.player && entry.stat != null
                 ? `${entry.player} (${entry.statLabel ?? "Stat"}: ${fmt(entry.stat)})`
                 : "N/A"}
@@ -76,7 +65,7 @@ export function LeadersBlock({
       ) : null}
 
       {!loading && !error && availableLeaders.length === 0 ? (
-        <div style={{ color: "var(--tgem-muted-strong)" }}>{emptyMessage}</div>
+        <div className="text-sm text-gray-700 dark:text-gray-300">{emptyMessage}</div>
       ) : null}
     </section>
   );

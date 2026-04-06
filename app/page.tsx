@@ -37,8 +37,8 @@ export default async function Home() {
               </h1>
 
               <p className="mt-4 max-w-2xl text-lg leading-relaxed text-gray-900 dark:text-gray-100">
-                Powered by the Tactical Game Evaluation Model
-                <sup className="tgem-tm">TM</sup> (v11.0)
+                A sports analytics engine built to help users find smarter pick&apos;em leans
+                through advanced modeling, matchup analysis, and weekly football context.
               </p>
 
               <p className="mt-3 max-w-2xl text-lg leading-relaxed text-gray-900 dark:text-gray-100">
@@ -104,6 +104,51 @@ export default async function Home() {
                   {insight.title}
                 </Link>
                 <p className="mt-2 leading-7 text-gray-700 dark:text-gray-300">{insight.detail}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="mt-10 w-full rounded-3xl border border-gray-200 bg-white px-8 py-10 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Learn the Platform</h2>
+          <p className="mt-3 max-w-3xl leading-7 text-gray-700 dark:text-gray-300">
+            These pages explain how TGEM works, how to think about pick&apos;em strategy, and how
+            to get more value out of the platform week to week.
+          </p>
+          <ul className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            {[
+              {
+                href: "/how-tgem-works",
+                title: "How TGEM Works",
+                detail: "Learn how TGEM turns team data, matchup context, and guardrails into a usable weekly lean.",
+              },
+              {
+                href: "/pickem-strategy",
+                title: "Pick'em Strategy",
+                detail: "Get a cleaner framework for separating strong weekly picks from volatility spots and coin flips.",
+              },
+              {
+                href: "/model-breakdown",
+                title: "Model Breakdown",
+                detail: "See the role the model plays, what it prioritizes, and why context matters to the read.",
+              },
+              {
+                href: "/contact",
+                title: "Contact TGEM",
+                detail: "Reach out with support questions, platform feedback, partnership ideas, or general inquiries.",
+              },
+            ].map((item) => (
+              <li
+                key={item.href}
+                className="rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-gray-800 dark:bg-gray-950/60"
+              >
+                <Link
+                  href={item.href}
+                  className="font-semibold text-gray-900 hover:underline dark:text-gray-100"
+                >
+                  {item.title}
+                </Link>
+                <p className="mt-2 leading-7 text-gray-700 dark:text-gray-300">{item.detail}</p>
               </li>
             ))}
           </ul>

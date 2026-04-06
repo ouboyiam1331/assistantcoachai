@@ -12,9 +12,10 @@ export default function TgemDisclaimer({ compact = false }: Props) {
       }`}
       style={{ lineHeight: 1.5 }}
     >
-      <strong>TGEM Disclaimer:</strong> TGEM outputs are leans and estimates, not
-      guarantees. The model will not be correct every time, and users are free to
-      pick against any TGEM lean based on their own judgment.
+      <strong>TGEM Disclaimer:</strong> TGEM is a model-driven analysis tool that produces
+      leans and estimates, not guarantees. It will not be accurate every time, and users
+      are always free to go with or against the lean based on their own football read and
+      personal judgment.
     </div>
   );
 }

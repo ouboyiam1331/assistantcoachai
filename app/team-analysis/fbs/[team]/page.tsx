@@ -100,6 +100,15 @@ function safeStr(s: string | null | undefined) {
   return s && String(s).trim().length ? String(s) : "N/A";
 }
 
+function formatClassificationLabel(value: string | null | undefined, fallback: string) {
+  const raw = String(value ?? fallback).trim();
+  if (!raw) return fallback;
+  const lowered = raw.toLowerCase();
+  if (lowered === "fbs") return "FBS";
+  if (lowered === "fcs") return "FCS";
+  return raw;
+}
+
 function parseDate(s: string | null | undefined) {
   if (!s) return null;
   const d = new Date(s);
@@ -233,7 +242,7 @@ function ColorSwatch({
           ["--swatch-color" as string]: color,
           width: 28,
           height: 28,
-          borderRadius: 5,
+          borderRadius: 9999,
           background: color,
           border: "1px solid #ccc",
           display: "inline-block",
@@ -508,6 +517,30 @@ function buildCoachNarrative(
       `The concern is ${weakness.label.toLowerCase()} - that is where momentum can swing if execution slips.`,
     );
   }
+  if (stats?.turnoverMarginPerGame != null || stats?.penaltyYardsPerGame != null) {
+    const turnoverNote =
+      stats?.turnoverMarginPerGame != null
+        ? stats.turnoverMarginPerGame >= 0
+          ? "they are not giving away many extra possessions"
+          : "the turnover profile still creates extra pressure"
+        : "the possession battle remains worth monitoring";
+    const disciplineNote =
+      stats?.penaltyYardsPerGame != null
+        ? stats.penaltyYardsPerGame <= 50
+          ? "discipline is helping them stay on schedule"
+          : "penalties can still stall otherwise good drives"
+        : "discipline remains part of the weekly swing picture";
+    read.push(
+      `From a weekly coaching view, ${turnoverNote} and ${disciplineNote}. That usually decides whether a stable profile actually closes games cleanly.`,
+    );
+  }
+  if (fourthDownPct != null) {
+    read.push(
+      fourthDownPct >= 55
+        ? "They have shown enough short-yardage trust to keep drives alive when they get aggressive."
+        : "Short-yardage and fourth-down moments still feel like a pressure point when the game tightens.",
+    );
+  }
   read.push(
     `With the ${phase[0].toUpperCase()}${phase.slice(1)} phase lens applied, TGEM is prioritizing consistency and execution over raw volume stats.`,
   );
@@ -550,7 +583,7 @@ function buildCoachNarrative(
 
   const coverage = 6 - missingLabels.length;
   return {
-    read: read.slice(0, 4),
+    read: read.slice(0, 6),
     keyReasons: keyReasons.slice(0, 5),
     flipFactors: flipFactors.slice(0, 3),
     bottomLine,
@@ -785,194 +818,102 @@ export default function FbsTeamPage() {
 
   return (
     <main className="tgem-shell">
-      <div style={{ marginBottom: 14 }}>
+      <div className="mb-4">
         <Link href={backHref} className="tgem-back-link">
           {backLabel}
         </Link>
       </div>
 
-      {/* Header */}
-      <section style={{ display: "flex", gap: 16, alignItems: "center" }}>
-        <div
-          style={{
-            width: 76,
-            height: 76,
-            borderRadius: 12,
-            background: badgeBg,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "hidden",
-            flexShrink: 0,
-            fontWeight: 700,
-            color: badgeTextColor,
-            border: `1px solid ${badgeBorder}`,
-            letterSpacing: 0.5,
-            fontSize: 20,
-          }}
-          title={teamName}
-        >
-          {teamBadgeText}
-        </div>
+      <section className="tgem-surface rounded-3xl p-6">
+        <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+          <div className="flex items-center gap-4">
+            <div
+              style={{
+                width: 76,
+                height: 76,
+                borderRadius: 12,
+                background: badgeBg,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+                flexShrink: 0,
+                fontWeight: 700,
+                color: badgeTextColor,
+                border: `1px solid ${badgeBorder}`,
+                letterSpacing: 0.5,
+                fontSize: 20,
+              }}
+              title={teamName}
+            >
+              {teamBadgeText}
+            </div>
 
-        <div>
-          <h1 style={{ margin: 0, fontSize: 28 }}>{teamName}</h1>
-          <div style={{ marginTop: 6, color: LEGACY_UI.mutedStrong }}>
-            <strong>Conference:</strong> {conference}{" "}
-            <span style={{ color: LEGACY_UI.muted }}>|</span>{" "}
-            <strong>Subdivision:</strong> {subdivision}
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{teamName}</h1>
+              <p className="mt-2 max-w-2xl text-sm text-gray-700 dark:text-gray-300">
+                College team profile with TGEM team grading, season production, key players,
+                and clickable matchup paths from the schedule.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <span className="tgem-surface-subtle rounded-full px-3 py-1">{conference}</span>
+                <span className="tgem-surface-subtle rounded-full px-3 py-1">{subdivision}</span>
+                <span className="tgem-surface-subtle rounded-full px-3 py-1">
+                  {formatClassificationLabel(mergedMeta?.classification, "FBS")}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="tgem-surface-subtle min-w-[260px] rounded-2xl p-4">
+            <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              Team Snapshot
+            </div>
+            <div className="mt-3 grid gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <div>
+                <strong className="text-gray-900 dark:text-gray-100">Team Name:</strong>{" "}
+                {safeStr(mergedMeta?.mascot)}
+              </div>
+              <div>
+                <strong className="text-gray-900 dark:text-gray-100">Timezone:</strong>{" "}
+                {safeStr(location?.timezone)}
+              </div>
+              <div>
+                <strong className="text-gray-900 dark:text-gray-100">Stadium:</strong>{" "}
+                {safeStr(location?.name)}
+              </div>
+              <div>
+                <strong className="text-gray-900 dark:text-gray-100">Capacity:</strong>{" "}
+                {fmt(location?.capacity ?? null)}
+              </div>
+              <div>
+                <strong className="text-gray-900 dark:text-gray-100">Grass:</strong>{" "}
+                {fmtBool(location?.grass ?? null)}
+              </div>
+            </div>
+            <div className="mt-4 text-sm font-semibold text-gray-900 dark:text-gray-100">
+              School Colors
+            </div>
+            <div className="mt-3 flex items-center gap-3">
+              <ColorSwatch value={colorProfile.primary} label="Primary" />
+              <ColorSwatch value={colorProfile.secondary} label="Secondary" />
+            </div>
           </div>
         </div>
       </section>
 
-      <hr style={{ margin: "18px 0" }} />
-
-      {/* Metadata */}
-      <h2 style={{ margin: "0 0 10px 0", fontSize: 18 }}>Team Metadata</h2>
-
-      <div
-        className="tgem-card"
-        style={{
-          border: `1px solid ${LEGACY_UI.border}`,
-          borderRadius: 12,
-          padding: 14,
-          marginBottom: 16,
-          background: LEGACY_UI.surface,
-        }}
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 10,
-          }}
-        >
-          <div>
-            <strong>Abbreviation:</strong> {safeStr(teamBadgeText)}
-          </div>
-          <div>
-            <strong>Mascot:</strong> {safeStr(mergedMeta?.mascot)}
-          </div>
-          <div>
-            <strong>Conference:</strong>{" "}
-            {safeStr(mergedMeta?.conference ?? conference)}
-          </div>
-          <div>
-            <strong>Classification:</strong>{" "}
-            {safeStr(mergedMeta?.classification ?? "FBS")}
-          </div>
-          <div>
-            <strong>School Colors:</strong>{" "}
-            {normalizeHexColor(colorProfile.primary) ||
-            normalizeHexColor(colorProfile.secondary) ? (
-              <>
-                <ColorSwatch value={colorProfile.primary} label="Primary" />
-                <ColorSwatch value={colorProfile.secondary} label="Secondary" />
-              </>
-            ) : (
-              safeStr(colorProfile.primary)
-            )}
-            <div style={{ marginTop: 6, fontSize: 12, color: LEGACY_UI.muted }}>
-              {colorProfile.sourceUrl ? (
-                <>
-                  {colorProfile.disclaimer}{" "}
-                  <a
-                    href={colorProfile.sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ textDecoration: "underline" }}
-                  >
-                    Source
-                  </a>
-                </>
-              ) : (
-                colorProfile.disclaimer
-              )}
-            </div>
-          </div>
-          <div>
-            <strong>Timezone:</strong> {safeStr(location?.timezone)}
-          </div>
-        </div>
-      </div>
-
-      {/* Stadium / Location */}
-      <h2 style={{ margin: "0 0 10px 0", fontSize: 18 }}>Stadium / Location</h2>
-      <div
-        className="tgem-card"
-        style={{
-          border: `1px solid ${LEGACY_UI.border}`,
-          borderRadius: 12,
-          padding: 14,
-          marginBottom: 18,
-          background: LEGACY_UI.surface,
-        }}
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 10,
-          }}
-        >
-          <div>
-            <strong>Stadium:</strong> {safeStr(location?.name)}
-          </div>
-          <div>
-            <strong>City/State:</strong> {safeStr(location?.city)}
-            {location?.state ? `, ${location.state}` : ""}
-          </div>
-
-          <div>
-            <strong>Capacity:</strong> {fmt(location?.capacity ?? null)}
-          </div>
-          <div>
-            <strong>Year Built:</strong>{" "}
-            {fmt(location?.year_constructed ?? null)}
-          </div>
-
-          <div>
-            <strong>Latitude:</strong>{" "}
-            {location?.latitude === null || location?.latitude === undefined
-              ? "N/A"
-              : String(location.latitude)}
-          </div>
-          <div>
-            <strong>Longitude:</strong>{" "}
-            {location?.longitude === null || location?.longitude === undefined
-              ? "N/A"
-              : String(location.longitude)}
-          </div>
-
-          <div>
-            <strong>Grass:</strong> {fmtBool(location?.grass ?? null)}
-          </div>
-          <div>
-            <strong>Dome:</strong> {fmtBool(location?.dome ?? null)}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ margin: "10px 0 16px 0" }}>
+      <div className="my-4">
         <AdSlot placement="INLINE_1" />
       </div>
       <section
-        className="tgem-card"
-        style={{
-          marginTop: 16,
-          marginBottom: 16,
-          border: `1px solid ${LEGACY_UI.border}`,
-          borderRadius: 12,
-          padding: 12,
-          background: LEGACY_UI.subtle,
-        }}
+        className="tgem-surface-subtle mt-6 rounded-3xl p-6"
       >
-        <h2 style={{ margin: "0 0 10px 0", fontSize: 18 }}>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
           TGEM v11 - Team Analysis
         </h2>
 
-        <div className="tgem-card" style={{ marginBottom: 10, padding: 12 }}>
-          <h3 style={{ margin: "0 0 8px 0", fontSize: 16 }}>TGEM Projection</h3>
+        <div className="tgem-surface mb-3 rounded-2xl p-4">
+          <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">TGEM Projection</h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <div>
               <strong>Team:</strong> {teamName || TGEM_NA_TEXT}
@@ -998,13 +939,7 @@ export default function FbsTeamPage() {
             ].map((flag) => (
               <span
                 key={flag}
-                style={{
-                  fontSize: 12,
-                  padding: "2px 8px",
-                  borderRadius: 999,
-                  border: `1px solid ${LEGACY_UI.border}`,
-                  background: LEGACY_UI.surface,
-                }}
+                className="tgem-surface-subtle rounded-full px-3 py-1 text-xs"
               >
                 {flag}
               </span>
@@ -1012,8 +947,8 @@ export default function FbsTeamPage() {
           </div>
         </div>
 
-        <div className="tgem-card" style={{ padding: 12 }}>
-          <div style={{ margin: "0 0 8px 0", fontSize: 16 }}>
+        <div className="tgem-surface rounded-2xl p-4">
+          <div className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
             <strong>TGEM Read</strong>
           </div>
           <div style={{ color: LEGACY_UI.text, lineHeight: 1.45 }}>
@@ -1064,17 +999,8 @@ export default function FbsTeamPage() {
       </section>
       {/* Season Stats (Placeholder) */}
       {/* Season Stats (CFBD) */}
-      <section
-        className="tgem-card"
-        style={{
-          marginTop: 14,
-          padding: 12,
-          border: `1px solid ${LEGACY_UI.border}`,
-          borderRadius: 10,
-          background: LEGACY_UI.surface,
-        }}
-      >
-        <div style={{ fontWeight: 800, marginBottom: 8, color: LEGACY_UI.text }}>
+      <section className="tgem-surface mt-4 rounded-3xl p-6">
+        <div className="mb-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
           Season Stats ({seasonStatsYear})
         </div>
         {seasonStatsNote ? (
@@ -1166,18 +1092,7 @@ export default function FbsTeamPage() {
             <button
               type="button"
               onClick={() => setShowExtendedSeasonTotals((current) => !current)}
-              style={{
-                appearance: "none",
-                background: LEGACY_UI.subtle,
-                border: `1px solid ${LEGACY_UI.border}`,
-                borderRadius: 10,
-                color: LEGACY_UI.text,
-                cursor: "pointer",
-                fontSize: 14,
-                fontWeight: 700,
-                marginBottom: showExtendedSeasonTotals ? 10 : 0,
-                padding: "8px 12px",
-              }}
+              className="tgem-button-secondary mb-0 rounded-xl px-3 py-2 text-sm font-semibold"
             >
               {showExtendedSeasonTotals
                 ? "Hide extended season totals"
@@ -1227,22 +1142,12 @@ export default function FbsTeamPage() {
         error={leadersError}
         leaders={leaders}
       />
-      <div style={{ margin: "14px 0" }}>
+      <div className="my-4">
         <AdSlot placement="INLINE_2" />
       </div>
 
-      <section
-        className="tgem-card"
-        style={{
-          marginTop: 14,
-          padding: 12,
-          border: `1px solid ${LEGACY_UI.border}`,
-          borderRadius: 10,
-          background: LEGACY_UI.surface,
-        }}
-      >
-      {/* Schedule */}
-      <h2 style={{ margin: "0 0 10px 0", fontSize: 18 }}>Schedule (Season {scheduleSeasonYear})</h2>
+      <section className="tgem-surface mt-4 rounded-3xl p-6">
+      <h2 className="mb-3 text-xl font-semibold text-gray-900 dark:text-gray-100">Schedule (Season {scheduleSeasonYear})</h2>
 
       {scheduleLoading ? (
         <div style={{ color: LEGACY_UI.muted }}>Loading schedule...</div>
@@ -1251,13 +1156,7 @@ export default function FbsTeamPage() {
       ) : schedule.length === 0 ? (
         <div style={{ color: LEGACY_UI.muted }}>No games returned for season {scheduleSeasonYear}.</div>
       ) : (
-        <div
-          style={{
-            overflowX: "auto",
-            border: `1px solid ${LEGACY_UI.border}`,
-            borderRadius: 12,
-          }}
-        >
+        <div className="overflow-x-auto rounded-2xl border border-[var(--tgem-border)]">
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: LEGACY_UI.subtle }}>

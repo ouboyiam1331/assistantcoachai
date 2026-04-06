@@ -389,8 +389,8 @@ function computeCachedTrafficSummary(): HomepageSummary {
   const summary: HomepageSummary = {
     heroBlurb:
       uniqueTeams.size > 0 || strongMatchupCount > 0
-        ? `TGEM Sports is currently serving cached college football analysis across ${uniqueTeams.size || "multiple"} team dashboards and ${strongMatchupCount || "live"} higher-confidence matchup reads, with other sports coming soon.`
-        : "Advanced college football analytics, matchup projections, and confidence-weighted insights for college football, with other sports coming soon.",
+        ? `TGEM Sports is a sports analytics engine built to help users find smarter pick'em leans through structured modeling, matchup analysis, and weekly football context across ${uniqueTeams.size || "multiple"} team dashboards and ${strongMatchupCount || "live"} higher-confidence reads.`
+        : "TGEM Sports is a sports analytics engine built to help users find smarter pick'em leans through structured modeling, matchup analysis, and weekly football context.",
     seoHeading: "College Football Pick'em Predictions, Team Analysis & Cached Matchup Insights",
     seoDescription:
       uniqueTeams.size > 0 || strongMatchupCount > 0
@@ -680,7 +680,7 @@ function buildWeeklySummary(context: WeeklySlateContext, rows: MatchupPayload[])
   const insights = buildWeeklyInsightRows(rows);
 
   return {
-    heroBlurb: `TGEM Sports is tracking Week ${context.week} with Monday-refreshed TGEM matchup reads across ${fbsCount} FBS and ${fcsCount} FCS spotlight games, surfacing ${highConfidenceCount} higher-confidence spots from a capped weekly slate to keep API usage lean.`,
+    heroBlurb: `TGEM Sports is a sports analytics engine built to help users find smarter pick'em leans through structured modeling, matchup analysis, and weekly football context. For Week ${context.week}, TGEM is tracking ${fbsCount} FBS and ${fcsCount} FCS spotlight games with ${highConfidenceCount} stronger weekly reads already in focus.`,
     seoHeading: `Week ${context.week} College Football Pick'em Insights & TGEM Matchup Reads`,
     seoDescription: `TGEM Sports is surfacing Monday-refreshed Week ${context.week} FBS and FCS matchup insights, including top matchups, hot reads, coin-flip alerts, and upset-watch spots selected from TGEM's weekly analysis.`,
     insights,

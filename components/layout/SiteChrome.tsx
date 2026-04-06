@@ -18,6 +18,16 @@ const NAV_LINKS = [
   { href: "/about", label: "About" },
 ];
 
+const FOOTER_LINKS = [
+  { href: "/about", label: "About TGEM Sports" },
+  { href: "/how-tgem-works", label: "How TGEM Works" },
+  { href: "/pickem-strategy", label: "Pick'em Strategy" },
+  { href: "/model-breakdown", label: "Model Breakdown" },
+  { href: "/contact", label: "Contact" },
+  { href: "/privacy-policy", label: "Privacy Policy" },
+  { href: "/terms-of-service", label: "Terms of Service" },
+];
+
 export default function SiteChrome({ children }: SiteChromeProps) {
   const pathname = usePathname();
   const isLegalPage = LEGAL_PATHS.has(pathname ?? "");
@@ -103,22 +113,16 @@ export default function SiteChrome({ children }: SiteChromeProps) {
             )}
           </p>
 
-          <div className="flex items-center gap-4">
-            <Link href="/about" className="hover:text-gray-900 hover:underline dark:hover:text-gray-100">
-              About TGEM Sports
-            </Link>
-            <Link
-              href="/privacy-policy"
-              className="hover:text-gray-900 hover:underline dark:hover:text-gray-100"
-            >
-              Privacy Policy
-            </Link>
-            <Link
-              href="/terms-of-service"
-              className="hover:text-gray-900 hover:underline dark:hover:text-gray-100"
-            >
-              Terms of Service
-            </Link>
+          <div className="flex flex-wrap items-center justify-center gap-4 sm:justify-end">
+            {FOOTER_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="hover:text-gray-900 hover:underline dark:hover:text-gray-100"
+              >
+                {link.label}
+              </Link>
+            ))}
           </div>
         </div>
       </footer>

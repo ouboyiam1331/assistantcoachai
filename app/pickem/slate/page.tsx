@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import TgemDisclaimer from "@/components/ui/TgemDisclaimer";
+import { findRivalryLabel } from "@/data/rivalries";
 import { FBS_TEAMS } from "@/data/fbsTeams";
 import {
   AUTO_SYNC_MS,
@@ -120,6 +121,37 @@ function phaseToLabel(phase: PickemPhase) {
   return "Regular Season";
 }
 
+function buildPickemContextNote(
+  game: SlateGame,
+  confidence: number | null,
+) {
+  const rivalryLabel = findRivalryLabel(game.homeTeam, game.awayTeam);
+  const homeIdentity = resolvePickemTeamIdentity(game.homeTeam);
+  const awayIdentity = resolvePickemTeamIdentity(game.awayTeam);
+  const homeConference = FBS_CONFERENCE_BY_SLUG.get(homeIdentity.token);
+  const awayConference = FBS_CONFERENCE_BY_SLUG.get(awayIdentity.token);
+  const homeTier = conferenceTier(homeConference);
+  const awayTier = conferenceTier(awayConference);
+  const bothPowerTier = homeIdentity.isFbs && awayIdentity.isFbs && homeTier >= 2 && awayTier >= 2;
+  const coinToss = confidence != null && confidence < 56;
+  const contestedTopMatchup =
+    bothPowerTier && confidence != null && confidence >= 56 && confidence <= 68;
+
+  if (rivalryLabel && coinToss) {
+    return `${rivalryLabel} adds rivalry pressure here, and TGEM still sees this as close enough to treat like a real coin-toss board spot.`;
+  }
+  if (rivalryLabel) {
+    return `${rivalryLabel} adds real rivalry pressure, so emotion and field position can compress the edge fast.`;
+  }
+  if (contestedTopMatchup) {
+    return "This reads like a highly contested top matchup, where both sides have enough profile strength to make the margin feel thinner than a normal favorite spot.";
+  }
+  if (coinToss) {
+    return "This projects like a coin-toss game, so late possessions, hidden yards, and turnover control matter more than any clean favorite narrative.";
+  }
+  return "";
+}
+
 function buildCoachLeanSynopsis(
   suggestion: GameSuggestion | null,
   game: SlateGame,
@@ -160,14 +192,15 @@ function buildCoachLeanSynopsis(
   const confidenceNum = typeof suggestion.confidence === "number" ? suggestion.confidence : null;
   const confidenceTier =
     confidenceNum == null ? "unknown" : confidenceNum >= 70 ? "high" : confidenceNum >= 56 ? "medium" : "low";
+  const contextNote = buildPickemContextNote(game, confidenceNum);
 
   if (confidenceTier === "high") {
-    return `Coach read: TGEM leans ${leaning} (confidence ${confidence}) in this ${phaseLabel} lens with strong conviction. The edge is built on ${topReasonA} and ${topReasonB}. The swing factor is ${swingFactor}. ${pressureSide} needs early-down wins plus clean ball security to flip this.`;
+    return `Coach read: TGEM leans ${leaning} (confidence ${confidence}) in this ${phaseLabel} lens with strong conviction. The edge is built on ${topReasonA} and ${topReasonB}. The swing factor is ${swingFactor}. ${contextNote ? `${contextNote} ` : ""}${pressureSide} needs early-down wins plus clean ball security to flip this.`;
   }
   if (confidenceTier === "medium") {
-    return `Coach read: TGEM leans ${leaning} (confidence ${confidence}) in this ${phaseLabel} lens, but this is still a playable fight. The edge comes from ${topReasonA} with support from ${topReasonB}. Swing factor: ${swingFactor}. ${pressureSide} can turn it with cleaner situational execution.`;
+    return `Coach read: TGEM leans ${leaning} (confidence ${confidence}) in this ${phaseLabel} lens, but this is still a playable fight. The edge comes from ${topReasonA} with support from ${topReasonB}. Swing factor: ${swingFactor}. ${contextNote ? `${contextNote} ` : ""}${pressureSide} can turn it with cleaner situational execution.`;
   }
-  return `Coach read: this projects as a tight game in the ${phaseLabel} lens (confidence ${confidence}). TGEM gives a slight lean to ${leaning}, driven by ${topReasonA}, but the margin is thin and volatility is real. Biggest swing point: ${swingFactor}. ${pressureSide} can absolutely take this with a clean first half and turnover edge.`;
+  return `Coach read: this projects as a tight game in the ${phaseLabel} lens (confidence ${confidence}). TGEM gives a slight lean to ${leaning}, driven by ${topReasonA}, but the margin is thin and volatility is real. Biggest swing point: ${swingFactor}. ${contextNote ? `${contextNote} ` : ""}${pressureSide} can absolutely take this with a clean first half and turnover edge.`;
 }
 
 function summarizeTgemReasonsFromApi(data: unknown, lean: "HOME" | "AWAY" | string | null) {

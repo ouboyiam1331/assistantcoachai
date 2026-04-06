@@ -356,9 +356,9 @@ button {
   border-color: var(--tgem-border);
 }
 
-.tgem-shell .tgem-color-swatch,
-.tgem-shell .tgem-color-swatch[style*="background"],
-.tgem-shell .tgem-color-swatch[style*="backgroundColor"] {
+.tgem-color-swatch,
+.tgem-color-swatch[style*="background"],
+.tgem-color-swatch[style*="backgroundColor"] {
   background: var(--swatch-color) !important;
   background-color: var(--swatch-color) !important;
   border-color: var(--tgem-border) !important;

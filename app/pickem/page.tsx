@@ -239,6 +239,11 @@ export default function PickemHomePage() {
             Build weekly pick&apos;em slates, let TGEM suggest winners and confidence
             levels, then track how you perform over the season.
           </p>
+          <p className="mx-auto mt-3 max-w-3xl text-center text-sm leading-7 text-gray-700 dark:text-gray-300">
+            TGEM is built to help users organize the board, not force the final decision. Use the
+            lean, confidence, and coach-style report as support, then make the call you believe is
+            strongest for your own contest.
+          </p>
           <div className="mx-auto mt-4 max-w-3xl">
             <TgemDisclaimer />
           </div>

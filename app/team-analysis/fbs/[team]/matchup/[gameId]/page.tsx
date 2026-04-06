@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import AdSlot from "@/components/ui/AdSlot";
 import TgemDisclaimer from "@/components/ui/TgemDisclaimer";
 
 import { FBS_TEAMS } from "@/data/fbsTeams";
+import { applyCollegeMatchupGuardrails } from "@/lib/college/matchupGuardrails";
 
 type TGEMResult = {
   ok: boolean;
@@ -175,6 +177,66 @@ function parsePhaseOverride(raw: string | null): TgemPhase | null {
 function fmtStat(value: number | null | undefined, digits = 1, pct = false) {
   if (value == null || Number.isNaN(value)) return "N/A";
   return pct ? `${value.toFixed(digits)}%` : value.toFixed(digits);
+}
+
+function SummaryTile({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="tgem-surface-subtle rounded-2xl p-4">
+      <div className="text-sm text-gray-700 dark:text-gray-300">{label}</div>
+      <div className="mt-2 text-xl font-semibold text-gray-900 dark:text-gray-100">{value}</div>
+    </div>
+  );
+}
+
+function TeamProfileCard({
+  title,
+  stats,
+}: {
+  title: string;
+  stats:
+    | {
+        pointsPerGame?: number | null;
+        pointsAllowedPerGame?: number | null;
+        yardsPerGame?: number | null;
+        yardsAllowedPerGame?: number | null;
+        thirdDownPct?: number | null;
+        fourthDownPct?: number | null;
+        turnoverMarginPerGame?: number | null;
+        penaltyYardsPerGame?: number | null;
+      }
+    | null
+    | undefined;
+}) {
+  const rows = [
+    ["Points Per Game", fmtStat(stats?.pointsPerGame)],
+    ["Points Allowed", fmtStat(stats?.pointsAllowedPerGame)],
+    ["Yards Per Game", fmtStat(stats?.yardsPerGame)],
+    ["Yards Allowed", fmtStat(stats?.yardsAllowedPerGame)],
+    ["3rd Down", fmtStat(stats?.thirdDownPct, 1, true)],
+    ["4th Down", fmtStat(stats?.fourthDownPct, 1, true)],
+    ["Turnover Margin", fmtStat(stats?.turnoverMarginPerGame)],
+    ["Penalty Yards", fmtStat(stats?.penaltyYardsPerGame)],
+  ] as const;
+
+  return (
+    <div className="tgem-surface-subtle rounded-2xl p-4">
+      <div className="font-semibold text-gray-900 dark:text-gray-100">{title}</div>
+      <div className="mt-3 space-y-2 text-sm text-gray-700 dark:text-gray-300">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex items-center justify-between gap-4">
+            <span>{label}</span>
+            <span className="font-medium text-gray-900 dark:text-gray-100">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 type SnapshotLine = {
@@ -518,6 +580,32 @@ export default function MatchupPage() {
     ];
   }, [tgem, homeSlug, awaySlug, teamSlug]);
 
+  const requestedTeamName = useMemo(
+    () => findTeamBySlug(teamSlug)?.name ?? tgem?.team ?? teamSlug,
+    [teamSlug, tgem?.team],
+  );
+  const requestedOpponentName = useMemo(
+    () =>
+      (opponentSlug ? findTeamBySlug(opponentSlug)?.name : null) ??
+      tgem?.opponent ??
+      opponentSlug ??
+      "Opponent",
+    [opponentSlug, tgem?.opponent],
+  );
+
+  const guardedSummary = useMemo(
+    () =>
+      applyCollegeMatchupGuardrails({
+        homeTeam: game?.homeTeam,
+        awayTeam: game?.awayTeam,
+        neutralSite: game?.neutralSite,
+        lean: tgem?.lean,
+        confidence: tgem?.confidence,
+        reasons: tgem?.reasons,
+      }),
+    [game?.awayTeam, game?.homeTeam, game?.neutralSite, tgem?.confidence, tgem?.lean, tgem?.reasons],
+  );
+
   const coachRead = useMemo(() => {
     if (!tgem) return null;
     const teamDisplay = findTeamBySlug(teamSlug)?.name ?? tgem.team ?? teamSlug;
@@ -530,11 +618,11 @@ export default function MatchupPage() {
     const teamIsHome = Boolean(homeSlug) && homeSlug === teamSlug;
     const teamIsAway = Boolean(awaySlug) && awaySlug === teamSlug;
     const favoredByLean =
-      tgem.lean === "HOME"
+      guardedSummary.lean === "HOME"
         ? teamIsHome
           ? teamDisplay
           : game?.homeTeam ?? teamDisplay
-        : tgem.lean === "AWAY"
+        : guardedSummary.lean === "AWAY"
           ? teamIsAway
             ? teamDisplay
             : game?.awayTeam ?? opponentDisplay
@@ -555,13 +643,16 @@ export default function MatchupPage() {
     return buildCoachMatchupRead({
       favored: favoredByLean,
       opponent: underdog,
-      confidence: tgem.confidence,
+      confidence: guardedSummary.confidence ?? undefined,
       phase: effectivePhase,
       favoredStats,
       opponentStats,
-      fallbackReasons: tgem.reasons ?? [],
+      fallbackReasons: guardedSummary.reasons,
     });
   }, [
+    guardedSummary.confidence,
+    guardedSummary.lean,
+    guardedSummary.reasons,
     tgem,
     teamSlug,
     opponentSlug,
@@ -573,17 +664,20 @@ export default function MatchupPage() {
   ]);
 
   return (
-    <main className="tgem-shell">
-      <div style={{ marginBottom: 14 }}>
-        <Link href={`/team-analysis/fbs/${teamSlug}`} className="tgem-back-link">
-          {"<- Back"}
+    <main className="tgem-page px-6 py-12">
+      <div className="mx-auto max-w-6xl">
+      <div className="mb-6 flex flex-wrap items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
+        <Link href={`/team-analysis/fbs/${teamSlug}`} className="hover:underline">
+          {"<- Back to Team Page"}
+        </Link>
+        <span>|</span>
+        <Link href="/team-analysis/fbs" className="hover:underline">
+          FBS Analysis Home
         </Link>
       </div>
-      <div style={{ marginBottom: 14 }}>
-      </div>
 
-      <h1 style={{ marginTop: 0, marginBottom: 8 }}>{seoHeading}</h1>
-      <p style={{ marginTop: 0, marginBottom: 16, maxWidth: 820, color: "var(--tgem-muted-strong)", lineHeight: 1.6 }}>
+      <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100" style={{ marginTop: 0, marginBottom: 8 }}>{seoHeading}</h1>
+      <p className="max-w-3xl text-gray-700 dark:text-gray-300" style={{ marginTop: 0, marginBottom: 16, lineHeight: 1.6 }}>
         {seoDescription}
       </p>
 
@@ -593,31 +687,34 @@ export default function MatchupPage() {
         <div style={{ color: "#666" }}>Loading game…</div>
       ) : (
         <>
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ color: "var(--tgem-muted-strong)" }}>
+          <div className="tgem-surface rounded-3xl p-6" style={{ marginBottom: 20 }}>
+            <div className="text-sm text-gray-700 dark:text-gray-300">
               <strong>Team:</strong> {teamSlug}{" "}
               <span style={{ color: "var(--tgem-muted)" }}>|</span> <strong>Season:</strong>{" "}
               {seasonYear} <span style={{ color: "var(--tgem-muted)" }}>|</span>{" "}
               <strong>Opponent:</strong> {opponentSlug || "Resolving…"}
             </div>
 
-            <h2 style={{ marginBottom: 6 }}>{title}</h2>
+            <h2 className="mt-3 text-2xl font-semibold text-gray-900 dark:text-gray-100" style={{ marginBottom: 6 }}>{title}</h2>
 
-            <div>
-              <strong>Date:</strong> {formatDateTime(game.startDate)}
-            </div>
-            <div>
-              <strong>Venue:</strong> {game.venue ?? "TBD"}
-              {game.neutralSite ? " (Neutral)" : ""}
-            </div>
-            <div>
-              <strong>Status:</strong> {status}
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <div className="tgem-surface-subtle rounded-2xl p-4 text-sm text-gray-700 dark:text-gray-300">
+                <div className="mb-1 font-semibold text-gray-900 dark:text-gray-100">Date</div>
+                {formatDateTime(game.startDate)}
+              </div>
+              <div className="tgem-surface-subtle rounded-2xl p-4 text-sm text-gray-700 dark:text-gray-300">
+                <div className="mb-1 font-semibold text-gray-900 dark:text-gray-100">Venue</div>
+                {game.venue ?? "TBD"}
+                {game.neutralSite ? " (Neutral)" : ""}
+              </div>
+              <div className="tgem-surface-subtle rounded-2xl p-4 text-sm text-gray-700 dark:text-gray-300">
+                <div className="mb-1 font-semibold text-gray-900 dark:text-gray-100">Status</div>
+                {status}
+              </div>
             </div>
           </div>
 
-          <hr style={{ margin: "18px 0" }} />
-
-          <h2 style={{ marginBottom: 10 }}>TGEM v11 Analysis</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100" style={{ marginBottom: 10 }}>TGEM v11 Analysis</h2>
           <TgemDisclaimer />
           <div style={{ marginBottom: 10, display: "flex", gap: 10, alignItems: "center" }}>
             <label htmlFor="phaseOverride" style={{ fontWeight: 600 }}>
@@ -645,134 +742,128 @@ export default function MatchupPage() {
 	          ) : !tgem ? (
 	            <div style={{ color: "#666" }}>Running TGEM…</div>
 	          ) : (
-            <div
-              className="tgem-card"
-              style={{
-                border: "1px solid #eee",
-                borderRadius: 12,
-                padding: 14,
-                color: "var(--foreground)",
-              }}
-            >
-              <div style={{ marginBottom: 8 }}>
-                <strong>Lean:</strong> {tgem.lean ?? "UNDEFINED"}
-              </div>
-              <div style={{ marginBottom: 8 }}>
-                <strong>Confidence:</strong>{" "}
-                {typeof tgem.confidence === "number"
-                  ? `${tgem.confidence} / 100`
-                  : "N/A"}
-              </div>
-	              <div style={{ marginBottom: 8 }}>
-                <strong>TGEM Ratings:</strong>{" "}
-                {typeof tgem.ratings?.team === "number" &&
-                typeof tgem.ratings?.opponent === "number" ? (
-                  <>
-                    {teamSlug}: {tgem.ratings.team} | {opponentSlug}:{" "}
-                    {tgem.ratings.opponent}
-                    {typeof tgem.ratings?.delta === "number" ? (
-                      <>
-                        {" "}
-                        | <strong>Rating Edge:</strong> {tgem.ratings.delta}
-                      </>
-                    ) : null}
-                  </>
-                ) : (
-                  "N/A"
-                )}
-              </div>
-              {typeof tgem.ratings?.delta === "number" ? (
-                <div style={{ marginBottom: 8, fontSize: 13, color: "var(--tgem-muted-strong)" }}>
-                  Rating Edge = {teamSlug} rating minus {opponentSlug} rating.
-                  Positive favors {teamSlug}; negative favors {opponentSlug}.
-                </div>
-              ) : null}
-              {coachRead ? (
-                <div style={{ marginBottom: 10, lineHeight: 1.5, color: "var(--foreground)" }}>
-                  <strong>TGEM Coach Read:</strong> {coachRead}
-                </div>
-              ) : null}
-              <div style={{ marginBottom: 6 }}>
-                <strong>Reasons Table (Away vs Home):</strong>
-              </div>
-              {reasonTable ? (
-                <div style={{ overflowX: "auto", color: "var(--foreground)" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr style={{ background: "var(--tgem-surface-subtle)", color: "var(--foreground)" }}>
-                        <th
-                          style={{
-                            textAlign: "left",
-                            padding: 8,
-                            borderBottom: "1px solid var(--tgem-border)",
-                          }}
-                        >
-                          Away ({game.awayTeam ?? "Away"})
-                        </th>
-                        <th
-                          style={{
-                            textAlign: "left",
-                            padding: 8,
-                            borderBottom: "1px solid var(--tgem-border)",
-                          }}
-                        >
-                          Reason
-                        </th>
-                        <th
-                          style={{
-                            textAlign: "left",
-                            padding: 8,
-                            borderBottom: "1px solid var(--tgem-border)",
-                          }}
-                        >
-                          Home ({game.homeTeam ?? "Home"})
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {reasonTable.map((row) => (
-                        <tr key={row.reason} style={{ color: "var(--foreground)" }}>
-                          <td style={{ padding: 8, borderBottom: "1px solid var(--tgem-border)", color: "var(--foreground)" }}>
-                            {row.away}
-                          </td>
-                          <td
-                            style={{
-                              padding: 8,
-                              borderBottom: "1px solid var(--tgem-border)",
-                              fontWeight: 600,
-                              color: "var(--foreground)",
-                            }}
-                          >
-                            {row.reason}
-                          </td>
-                          <td style={{ padding: 8, borderBottom: "1px solid var(--tgem-border)", color: "var(--foreground)" }}>
-                            {row.home}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <ul style={{ marginTop: 6, color: "var(--foreground)" }}>
-                  {(tgem.reasons ?? []).map((r, i) => (
-                    <li key={i}>{r}</li>
-                  ))}
-                </ul>
-              )}
-
-              {tgem.stats ? (
-                <>
-                  <hr style={{ margin: "14px 0" }} />
-                  <div style={{ fontSize: 13, color: "var(--tgem-muted-strong)" }}>
-                    <strong>Stats Snapshot:</strong>
-                    <pre style={{ whiteSpace: "pre-wrap", color: "var(--foreground)" }}>
-                      {JSON.stringify(tgem.stats, null, 2)}
-                    </pre>
+            <div className="space-y-6">
+              <div className="space-y-6">
+                <section className="tgem-surface rounded-3xl p-6 text-gray-900 dark:text-gray-100">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    Team Profiles
+                  </h3>
+                  <p className="mt-2 text-sm leading-7 text-gray-700 dark:text-gray-300">
+                    Current team profile snapshots pulled from the same college data already powering
+                    the matchup read.
+                  </p>
+                  <div className="mt-4 grid gap-4">
+                    <TeamProfileCard title={requestedTeamName} stats={tgem.statsSnapshot?.team} />
+                    <TeamProfileCard title={requestedOpponentName} stats={tgem.statsSnapshot?.opponent} />
                   </div>
-                </>
-              ) : null}
-	            </div>
+                </section>
+
+                <AdSlot placement="INLINE_1" className="rounded-3xl" />
+
+                <section className="tgem-surface rounded-3xl p-6 text-gray-900 dark:text-gray-100">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    Weighted Category Scores
+                  </h3>
+                  <p className="mt-2 text-sm leading-7 text-gray-700 dark:text-gray-300">
+                    This keeps the existing college comparison logic, but presents it as a cleaner
+                    side-by-side scoring board.
+                  </p>
+                  {reasonTable ? (
+                    <div className="mt-4 overflow-x-auto text-sm text-gray-700 dark:text-gray-300">
+                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <thead>
+                          <tr style={{ background: "var(--tgem-surface-subtle)", color: "var(--foreground)" }}>
+                            <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid var(--tgem-border)" }}>
+                              Away ({game.awayTeam ?? "Away"})
+                            </th>
+                            <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid var(--tgem-border)" }}>
+                              Category
+                            </th>
+                            <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid var(--tgem-border)" }}>
+                              Home ({game.homeTeam ?? "Home"})
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {reasonTable.map((row) => (
+                            <tr key={row.reason}>
+                              <td style={{ padding: 8, borderBottom: "1px solid var(--tgem-border)" }}>{row.away}</td>
+                              <td style={{ padding: 8, borderBottom: "1px solid var(--tgem-border)", fontWeight: 600 }}>{row.reason}</td>
+                              <td style={{ padding: 8, borderBottom: "1px solid var(--tgem-border)" }}>{row.home}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-gray-700 dark:text-gray-300">
+                      {(tgem.reasons ?? []).map((r, i) => (
+                        <li key={i}>{r}</li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              </div>
+
+              <section className="tgem-surface rounded-3xl p-6 text-gray-900 dark:text-gray-100">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                  TGEM Read
+                </h3>
+                <p className="mt-2 text-sm leading-7 text-gray-700 dark:text-gray-300">
+                  The model output below is unchanged. This is the same lean, confidence, and reasons,
+                  just organized into a cleaner read.
+                </p>
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <SummaryTile label="Lean" value={guardedSummary.lean ?? "UNDEFINED"} />
+                  <SummaryTile
+                    label="Confidence"
+                    value={
+                      typeof guardedSummary.confidence === "number"
+                        ? `${guardedSummary.confidence} / 100`
+                        : "N/A"
+                    }
+                  />
+                  <SummaryTile
+                    label="Rating Edge"
+                    value={
+                      typeof tgem.ratings?.delta === "number"
+                        ? String(tgem.ratings.delta)
+                        : "N/A"
+                    }
+                  />
+                </div>
+                <div className="mt-4 text-sm text-gray-700 dark:text-gray-300">
+                  {typeof tgem.ratings?.team === "number" && typeof tgem.ratings?.opponent === "number" ? (
+                    <>
+                      <strong className="text-gray-900 dark:text-gray-100">TGEM Ratings:</strong>{" "}
+                      {requestedTeamName}: {tgem.ratings.team} | {requestedOpponentName}: {tgem.ratings.opponent}
+                    </>
+                  ) : null}
+                </div>
+                {coachRead ? (
+                  <p className="mt-4 text-sm leading-7 text-gray-700 dark:text-gray-300">
+                    <strong className="text-gray-900 dark:text-gray-100">TGEM Coach Read:</strong>{" "}
+                    {coachRead}
+                  </p>
+                ) : null}
+                <div className="mt-4">
+                  <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">Model Reasons</div>
+                  <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-gray-700 dark:text-gray-300">
+                    {guardedSummary.reasons.map((r, i) => (
+                      <li key={i}>{r}</li>
+                    ))}
+                  </ul>
+                </div>
+                {tgem.stats ? (
+                  <details className="mt-4 text-sm text-gray-700 dark:text-gray-300">
+                    <summary className="cursor-pointer font-semibold text-gray-900 dark:text-gray-100">
+                      View raw stats snapshot
+                    </summary>
+                    <pre className="mt-3 whitespace-pre-wrap">{JSON.stringify(tgem.stats, null, 2)}</pre>
+                  </details>
+                ) : null}
+              </section>
+            </div>
 	          )}
           <div className="tgem-cta-success" style={{ marginTop: 16, padding: 16 }}>
             <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
@@ -801,6 +892,7 @@ export default function MatchupPage() {
           </div>
 	        </>
 	      )}
+      </div>
     </main>
   );
 }
