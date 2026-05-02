@@ -60,6 +60,17 @@ export default async function Home() {
                   Pick&apos;em Mode
                 </Link>
               </div>
+
+              <p className="mt-4 text-sm leading-7 text-gray-700 dark:text-gray-300">
+                Want the model logic first?{" "}
+                <Link
+                  href="/how-tgem-works"
+                  className="font-semibold text-gray-900 underline underline-offset-2 dark:text-gray-100"
+                >
+                  Learn how TGEM works
+                </Link>
+                .
+              </p>
             </div>
 
             <div className="mx-auto w-full max-w-md">

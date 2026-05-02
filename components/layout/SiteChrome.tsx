@@ -15,6 +15,7 @@ const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/team-analysis", label: "Team Analysis" },
   { href: "/pickem", label: "Pick'em" },
+  { href: "/how-tgem-works", label: "How TGEM Works" },
   { href: "/about", label: "About" },
 ];
 
