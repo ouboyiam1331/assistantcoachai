@@ -444,11 +444,11 @@ function getTotalNum(totals: SeasonTotals | null, key: string) {
 
 const TEAM_PHASE_PROFILES: Record<
   TGEMPhase,
-  { overallMix: { offense: number; defense: number; discipline: number; specialTeams: number }; confidenceBoost: number }
+  { overallMix: { offense: number; defense: number; discipline: number; specialTeams: number }; consistencyBoost: number }
 > = {
-  regular: { overallMix: { offense: 0.34, defense: 0.3, discipline: 0.2, specialTeams: 0.16 }, confidenceBoost: 0 },
-  championship: { overallMix: { offense: 0.31, defense: 0.35, discipline: 0.22, specialTeams: 0.12 }, confidenceBoost: 3 },
-  postseason: { overallMix: { offense: 0.28, defense: 0.38, discipline: 0.24, specialTeams: 0.1 }, confidenceBoost: 6 },
+  regular: { overallMix: { offense: 0.34, defense: 0.3, discipline: 0.2, specialTeams: 0.16 }, consistencyBoost: 0 },
+  championship: { overallMix: { offense: 0.31, defense: 0.35, discipline: 0.22, specialTeams: 0.12 }, consistencyBoost: 3 },
+  postseason: { overallMix: { offense: 0.28, defense: 0.38, discipline: 0.24, specialTeams: 0.1 }, consistencyBoost: 6 },
 };
 
 function classifyTeamTgemPhase(schedule: ScheduleGame[]): TGEMPhase {
@@ -541,17 +541,10 @@ function buildTgemTeamAnalysis(
     stats.penaltyYardsPerGame,
     netReturnYpg,
   ].filter((x) => x != null).length;
-  const confidence = clampScore(
-    Math.min(97, 35 + Math.min(16, Math.max(0, games)) * 2.8 + dataCoverage * 3 + profile.confidenceBoost),
+  const consistencyScore = clampScore(
+    Math.min(97, 35 + Math.min(16, Math.max(0, games)) * 2.8 + dataCoverage * 3 + profile.consistencyBoost),
   );
-  const notes: string[] = [];
-  if (stats.pointsPerGame != null) notes.push(`PPG: ${stats.pointsPerGame.toFixed(1)}`);
-  if (stats.pointsAllowedPerGame != null) notes.push(`PPG Allowed: ${stats.pointsAllowedPerGame.toFixed(1)}`);
-  if (stats.turnoverMarginPerGame != null) notes.push(`Turnover Margin/G: ${stats.turnoverMarginPerGame.toFixed(1)}`);
-  if (stats.thirdDownPct != null) notes.push(`3rd Down: ${stats.thirdDownPct.toFixed(1)}%`);
-  if (fourthDownPct != null) notes.push(`4th Down: ${fourthDownPct.toFixed(1)}%`);
-  notes.push(`Phase Profile: ${phase.toUpperCase()}`);
-  return { overall, confidence, offense, defense, discipline, specialTeams, notes };
+  return { overall, consistencyScore, offense, defense, discipline, specialTeams };
 }
 
 const TGEM_NA_TEXT = "Not Available";
@@ -561,16 +554,15 @@ function fmtScore100(value: number | null | undefined) {
   return `${value} / 100`;
 }
 
-function getStabilityLabel(confidence: number | null | undefined) {
-  if (confidence == null || Number.isNaN(confidence)) return TGEM_NA_TEXT;
-  if (confidence >= 80) return "High";
-  if (confidence >= 60) return "Medium";
+function getStabilityLabel(consistencyScore: number | null | undefined) {
+  if (consistencyScore == null || Number.isNaN(consistencyScore)) return TGEM_NA_TEXT;
+  if (consistencyScore >= 80) return "High";
+  if (consistencyScore >= 60) return "Medium";
   return "Low";
 }
 
 function buildCoachNarrative(
   teamName: string,
-  phase: TGEMPhase,
   analysis: ReturnType<typeof buildTgemTeamAnalysis> | null,
   stats: SeasonStats | null,
   fourthDownPct: number | null,
@@ -594,87 +586,98 @@ function buildCoachNarrative(
     stats?.penaltyYardsPerGame == null ? "penalty yards per game" : null,
   ].filter(Boolean) as string[];
 
-  const read: string[] = [];
-  if (strengths.length > 0) {
-    const first = strengths[0];
-    const second = strengths[1];
-    read.push(
-      `${teamName}'s identity right now is ${first.label.toLowerCase()}${second ? ` and ${second.label.toLowerCase()}` : ""} - they make opponents earn everything.`,
-    );
-    read.push(
-      `${first.label} is the engine of this team, winning down-to-down and controlling game flow. ${second ? `${second.label} supports drive stability and keeps the plan clean.` : "Execution has been consistent in key moments."}`,
-    );
-  } else {
-    read.push(`${teamName} does not have enough complete team signals for a full identity read yet.`);
-  }
-  if (weakness) {
-    read.push(
-      `The concern is ${weakness.label.toLowerCase()} - that is where momentum can swing if execution slips.`,
-    );
-  }
-  if (stats?.turnoverMarginPerGame != null || stats?.penaltyYardsPerGame != null) {
-    const turnoverNote =
-      stats?.turnoverMarginPerGame != null
-        ? stats.turnoverMarginPerGame >= 0
-          ? "they are protecting possessions well enough to keep pressure on the other side"
-          : "the turnover profile still leaves too many escape routes open"
-        : "the possession battle is still a live weekly variable";
-    const disciplineNote =
-      stats?.penaltyYardsPerGame != null
-        ? stats.penaltyYardsPerGame <= 50
-          ? "discipline is helping the weekly plan stay clean"
-          : "penalties are still giving away hidden yards"
-        : "discipline still matters in the swing moments";
-    read.push(
-      `From a sideline read, ${turnoverNote} and ${disciplineNote}. That tends to decide whether a good FCS profile actually controls the game or just flashes it.`,
-    );
-  }
-  if (fourthDownPct != null) {
-    read.push(
-      fourthDownPct >= 55
-        ? "They have shown enough short-yardage confidence to keep a few more drives alive than average."
-        : "Short-yardage situations still look like a place where momentum can leak away.",
-    );
-  }
-  read.push(
-    `With the ${phase[0].toUpperCase()}${phase.slice(1)} phase lens applied, TGEM is prioritizing consistency and execution over raw volume stats.`,
-  );
-  if (missingLabels.length > 0) {
-    read.push(
-      `Missing data: ${missingLabels.join(", ")}. TGEM is using available unit grades and phase weighting as fallback.`,
-    );
-  }
-
   const topUnit = strengths[0] ?? null;
   const secondUnit = strengths[1] ?? null;
-  const stabilityLabel = getStabilityLabel(analysis?.confidence ?? null);
-  const keyReasons: string[] = [];
-  if (topUnit) keyReasons.push(`${topUnit.label} dominance (${topUnit.value} grade)`);
-  if (secondUnit) keyReasons.push(`Strong ${secondUnit.label.toLowerCase()} support profile`);
-  keyReasons.push(`Strong stability rating (${analysis?.confidence ?? TGEM_NA_TEXT} confidence)`);
-  keyReasons.push(
-    `${(analysis?.offense ?? 0) >= 70 ? "Offense is steady, not explosive" : "Offense variability remains a pressure point"}`,
+  const stabilityLabel = getStabilityLabel(analysis?.consistencyScore ?? null);
+  const seed = Array.from(teamName).reduce(
+    (total, char, index) => (total * 31 + char.charCodeAt(0) * (index + 5)) >>> 0,
+    0,
   );
-  keyReasons.push(
-    `${(analysis?.specialTeams ?? 0) >= 65 ? "Special teams are stable enough to protect field position" : "Special teams volatility is still present"}`,
-  );
-
-  const flipFactors: string[] = [
-    "Red-zone trips stall into field goals.",
-    "Special teams miscues swing field position.",
-    "Early offensive inefficiency forces pressure.",
+  const pick = <T,>(items: T[], offset = 0) => items[(seed + offset) % items.length];
+  const topLabel = topUnit?.label.toLowerCase() ?? "overall structure";
+  const secondLabel = secondUnit?.label.toLowerCase() ?? "supporting unit play";
+  const weakLabel = weakness?.label.toLowerCase() ?? "week-to-week consistency";
+  const readShapes = [
+    [
+      `${teamName} has to be read through the part of the profile that travels best, and right now that starts with ${topLabel}.`,
+      `${secondUnit ? `${secondUnit.label} gives the team another stabilizing piece.` : "The rest of the profile is still taking shape around that main point."}`,
+      `${weakness ? `${weakness.label} is where the staff would want cleaner answers over a longer sample.` : "There is not one obvious soft spot in the available categories yet."}`,
+      `${stats?.turnoverMarginPerGame != null ? "Possession margin helps explain whether the team is making its own job easier or harder." : "Possession detail will matter more as the season file fills in."}`,
+    ],
+    [
+      `The FCS read on ${teamName} is less about one headline and more about how the units fit together.`,
+      `${topUnit ? `${topUnit.label} is the area giving the profile its strongest shape.` : "The strongest area is still hard to separate from the rest of the sample."}`,
+      `${stats?.penaltyYardsPerGame != null ? "Penalty yardage adds context because hidden yards can change field position quickly at this level." : "Discipline detail will round out the evaluation when it is complete."}`,
+      `${weakness ? `${weakness.label} remains the category that can make the team profile feel uneven.` : "The available data keeps the analysis broad for now."}`,
+    ],
+    [
+      `${teamName}'s profile is most useful when it is read like a staff note: identify the reliable unit, then check what can interrupt it.`,
+      `${topUnit ? `${topUnit.label} is the reliable piece in the current sample.` : "The reliable piece is still emerging."}`,
+      `${secondUnit ? `${secondUnit.label} gives the team some additional support.` : "The next layer will depend on more complete weekly data."}`,
+      `${weakness ? `${weakness.label} is the area that needs more consistent answers.` : "No single concern separates clearly from the rest yet."}`,
+    ],
+    [
+      `${teamName}'s FCS profile starts with what can be trusted over multiple series.`,
+      `${topUnit ? `${topUnit.label} is the part of the team that currently gives the cleanest answer.` : "That trusted piece is still developing in the available sample."}`,
+      `${weakness ? `${weakness.label} is where the review needs to stay honest because it can affect field position and tempo.` : "The main review points are spread across the team rather than sitting in one category."}`,
+      `${stats?.thirdDownPct != null ? "Third-down work matters here because it decides whether the offense or defense gets off the field cleanly." : "Third-down data will make the read more specific when it fills in."}`,
+    ],
+    [
+      `A clean read on ${teamName} starts by separating steady habits from one-off results.`,
+      `${secondUnit ? `${secondUnit.label} is part of that steady base.` : `${topLabel} is the first place to look for that base.`}`,
+      `${stats?.penaltyYardsPerGame != null ? "Penalty yardage helps show whether the team is making the down-and-distance math harder than necessary." : "Discipline detail is still part of the missing context."}`,
+      `${weakness ? `${weakness.label} is the category most likely to decide whether a strong series becomes a full-game trait.` : "The profile does not isolate one clear limiter yet."}`,
+    ],
   ];
-
+  const read = [
+    removeDuplicateSentences(pick(readShapes).join(" ")),
+    ...(missingLabels.length > 0 ? [`Incomplete supporting categories: ${missingLabels.join(", ")}.`] : []),
+  ];
+  const strengthPool = [
+    topUnit ? pick([`${topUnit.label} is the strongest current signal`, `${topUnit.label} is the most dependable part of the team read`, `${topUnit.label} gives the profile its clearest starting point`], 3) : null,
+    secondUnit ? pick([`${secondUnit.label} gives the profile another useful layer`, `${secondUnit.label} helps support the primary team strength`, `${secondUnit.label} adds a second point of stability`], 5) : null,
+    (analysis?.offense ?? 0) >= 70 ? pick(["Offensive production is helping keep possessions on schedule", "The offense is producing enough structure to support the rest of the team", "Offensive efficiency is showing up as a useful weekly trait"], 7) : null,
+    (analysis?.defense ?? 0) >= 70 ? pick(["Defensive resistance is a clear part of the team identity", "The defense is keeping the team profile grounded", "Defensive work is limiting easy answers from opponents"], 9) : null,
+    (analysis?.discipline ?? 0) >= 70 ? pick(["Discipline is supporting field position and drive quality", "Cleaner penalty habits are helping the weekly profile", "Possession care is keeping avoidable strain down"], 11) : null,
+    (analysis?.specialTeams ?? 0) >= 65 ? pick(["Special teams are helping with hidden-yardage control", "The field-position units are adding useful support", "Special teams are keeping the team from losing easy yardage"], 13) : null,
+    stats?.turnoverMarginPerGame != null && stats.turnoverMarginPerGame >= 0
+      ? "Possession margin is not working against the team profile"
+      : null,
+    fourthDownPct != null && fourthDownPct >= 55 ? "Short-yardage execution is extending drives" : null,
+  ].filter(Boolean) as string[];
+  const monitorPool = [
+    weakness ? pick([`${weakness.label} needs the closest week-to-week review`, `${weakness.label} is the main category to keep testing`, `${weakness.label} is where the profile can lose some shape`], 15) : null,
+    (analysis?.offense ?? 100) < 60 ? pick(["Offensive consistency can tighten up across possessions", "The offense needs more reliable answers on routine downs", "Drive rhythm can flatten when the offense falls behind schedule"], 17) : null,
+    (analysis?.defense ?? 100) < 60 ? pick(["Defensive series need more repeatable stops", "The defense needs cleaner exits from long possessions", "Opponent movement can become too comfortable if stops arrive late"], 19) : null,
+    (analysis?.discipline ?? 100) < 60 ? pick(["Penalties and possession details can create avoidable strain", "Hidden yardage can make the profile harder to sustain", "Discipline details remain a week-to-week review point"], 21) : null,
+    (analysis?.specialTeams ?? 100) < 60 ? pick(["Special teams can still swing field position", "The kicking and return game needs steadier hidden-yardage results", "Field-position exchanges can get away from the team when special teams are uneven"], 23) : null,
+    stats?.turnoverMarginPerGame != null && stats.turnoverMarginPerGame < 0
+      ? "Turnover margin is adding stress to the profile"
+      : null,
+    stats?.thirdDownPct != null && stats.thirdDownPct < 36
+      ? "Third-down conversion rate can limit drive length"
+      : null,
+    fourthDownPct != null && fourthDownPct < 45 ? "Fourth-down situations remain a review point" : null,
+  ].filter(Boolean) as string[];
+  const keyReasons = rotateList(strengthPool.length ? strengthPool : [`${teamName}'s best signals will sharpen with more data`], seed).slice(0, 5);
+  const flipFactors = rotateList(monitorPool.length ? monitorPool : ["Additional season data will define the main review points"], seed + 7).slice(0, 3);
   const overall = analysis?.overall ?? null;
-  const stability = stabilityLabel;
-  const bottomLine =
+  const summaries = [
     overall == null
-      ? `${teamName} projects as ${TGEM_NA_TEXT} until more complete team data is available.`
-      : `${teamName} projects as a ${stability.toLowerCase()} stability ${topUnit ? topUnit.label.toLowerCase() : "balanced"} team in this ${phase.toLowerCase()} lens - if they stay clean, they are built to grind.`;
+      ? `${teamName}'s team profile will become clearer as the season sample fills in.`
+      : `${teamName} is currently defined most by ${topLabel}, while ${weakLabel} is the detail that still needs regular review.`,
+    overall == null
+      ? `The current ${teamName} read is still early and should stay tied to available team information.`
+      : `The cleanest summary for ${teamName}: ${topLabel} gives the team its foundation, and ${weakLabel} shapes the next layer of review.`,
+    overall == null
+      ? `${teamName}'s profile is waiting on a fuller set of team data.`
+      : `${teamName}'s best team view starts with ${topLabel}; ${secondLabel} and ${weakLabel} explain how complete the profile feels.`,
+  ];
+  const bottomLine = pick(summaries, 11);
 
   const coverage = 6 - missingLabels.length;
   return {
-    read: read.slice(0, 6),
+    read: read.slice(0, 2),
     keyReasons: keyReasons.slice(0, 5),
     flipFactors: flipFactors.slice(0, 3),
     bottomLine,
@@ -682,7 +685,6 @@ function buildCoachNarrative(
     grading: {
       overall: analysis?.overall ?? null,
       stabilityLabel,
-      confidence: analysis?.confidence ?? null,
       offense: analysis?.offense ?? null,
       defense: analysis?.defense ?? null,
       discipline: analysis?.discipline ?? null,
@@ -706,6 +708,12 @@ function isSameTeam(a?: string | null, b?: string | null) {
   const nb = normalizeTeamName(b);
   if (!na || !nb) return false;
   return na === nb || na.includes(nb) || nb.includes(na);
+}
+
+function rotateList<T>(items: T[], seed: number) {
+  if (items.length <= 1) return items;
+  const offset = seed % items.length;
+  return [...items.slice(offset), ...items.slice(0, offset)];
 }
 
 export default function FcsTeamPage() {
@@ -858,12 +866,11 @@ export default function FcsTeamPage() {
     () =>
       buildCoachNarrative(
         teamName,
-        tgemPhase,
         tgemTeamAnalysis,
         seasonStats,
         fourthDownPct,
       ),
-    [teamName, tgemPhase, tgemTeamAnalysis, seasonStats, fourthDownPct],
+    [teamName, tgemTeamAnalysis, seasonStats, fourthDownPct],
   );
 
   const teamBadgeText = buildTeamBadgeText(teamName, meta?.abbreviation);
@@ -917,7 +924,7 @@ export default function FcsTeamPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{teamName}</h1>
           <p className="mt-2 max-w-2xl text-sm text-gray-700 dark:text-gray-300">
-            FCS team profile with TGEM team grading, season production, key players,
+            FCS team profile with TGEM team context, season production, key players,
             and clickable matchup paths from the schedule.
           </p>
           <div className="mt-3 flex flex-wrap gap-2 text-sm text-gray-700 dark:text-gray-300">
@@ -956,12 +963,11 @@ export default function FcsTeamPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-3xl">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-              Learn what this TGEM read is measuring
+              Understanding the TGEM team profile
             </h2>
             <p className="mt-2 text-sm leading-7 text-gray-700 dark:text-gray-300">
-              TGEM uses more than rankings or record alone. This team page is built around
-              performance signals, consistency, and matchup-aware context, and the full guide
-              explains how those pieces work together.
+              This page organizes team identity, season production, consistency, and schedule
+              context into a cleaner football read before you dig deeper into the numbers below.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -975,7 +981,7 @@ export default function FcsTeamPage() {
               href="/model-breakdown"
               className="rounded-lg border border-[var(--tgem-border)] px-5 py-3 text-sm font-semibold text-gray-900 hover:bg-[var(--tgem-surface)] dark:text-gray-100"
             >
-              Model Breakdown
+              Profile Breakdown
             </Link>
           </div>
         </div>
@@ -986,32 +992,32 @@ export default function FcsTeamPage() {
       </div>
 
       <section className="tgem-surface-subtle mt-6 rounded-3xl p-6">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">TGEM v11 - Team Analysis</h2>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">TGEM Team Profile</h2>
 
         <div className="tgem-surface mb-3 rounded-2xl p-4">
-          <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">TGEM Projection</h3>
+          <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">Team Profile Summary</h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <div>
               <strong>Team:</strong> {teamName || TGEM_NA_TEXT}
             </div>
             <div>
-              <strong>Overall Team Rating:</strong>{" "}
+              <strong>Team Profile Score:</strong>{" "}
               {seasonStatsLoading ? "Computing..." : fmtScore100(tgemTeamAnalysis?.overall)}
             </div>
             <div>
-              <strong>Phase Label:</strong> {tgemPhase.toUpperCase()}
+              <strong>Current View:</strong> Season profile
             </div>
             <div>
-              <strong>Stability / Confidence:</strong>{" "}
-              {seasonStatsLoading ? "Computing..." : fmtScore100(tgemTeamAnalysis?.confidence)}
+              <strong>Consistency Indicator:</strong>{" "}
+              {seasonStatsLoading ? "Computing..." : fmtScore100(tgemTeamAnalysis?.consistencyScore)}
             </div>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
             {[
-              `Model: TGEM v11`,
-              `Coverage: ${tgemCoach.coverage}/6`,
+              `Profile: Team view`,
+              `Available categories: ${tgemCoach.coverage}/6`,
               `Games: ${seasonStats?.games ?? TGEM_NA_TEXT}`,
-              `Stability: ${getStabilityLabel(tgemTeamAnalysis?.confidence ?? null)}`,
+              `Consistency: ${getStabilityLabel(tgemTeamAnalysis?.consistencyScore ?? null)}`,
             ].map((flag) => (
               <span key={flag} className="tgem-surface-subtle rounded-full px-3 py-1 text-xs">
                 {flag}
@@ -1033,13 +1039,10 @@ export default function FcsTeamPage() {
           </div>
 
           <div style={{ marginTop: 8 }}>
-            <strong>Grading</strong>
+            <strong>Team Profile Breakdown</strong>
             <ul style={{ margin: "6px 0 0 18px" }}>
-              <li>Overall grade: {tgemCoach.grading.overall ?? TGEM_NA_TEXT}</li>
-              <li>
-                Stability: {tgemCoach.grading.stabilityLabel}
-                {tgemCoach.grading.confidence != null ? ` (${tgemCoach.grading.confidence})` : ""}
-              </li>
+              <li>Overall: {tgemCoach.grading.overall ?? TGEM_NA_TEXT}</li>
+              <li>Consistency Indicator: {tgemCoach.grading.stabilityLabel}</li>
               <li>Offense: {tgemCoach.grading.offense ?? TGEM_NA_TEXT}</li>
               <li>Defense: {tgemCoach.grading.defense ?? TGEM_NA_TEXT}</li>
               <li>Discipline: {tgemCoach.grading.discipline ?? TGEM_NA_TEXT}</li>
@@ -1048,7 +1051,7 @@ export default function FcsTeamPage() {
           </div>
 
           <div style={{ marginTop: 8 }}>
-            <strong>Key Reasons</strong>
+            <strong>Strength Signals</strong>
             <ul style={{ margin: "6px 0 0 18px" }}>
               {tgemCoach.keyReasons.map((reason) => (
                 <li key={reason}>{reason}</li>
@@ -1057,7 +1060,7 @@ export default function FcsTeamPage() {
           </div>
 
           <div style={{ marginTop: 8 }}>
-            <strong>Flip Factors</strong>
+            <strong>Areas to Monitor</strong>
             <ul style={{ margin: "6px 0 0 18px" }}>
               {tgemCoach.flipFactors.map((factor) => (
                 <li key={factor}>{factor}</li>
@@ -1066,7 +1069,7 @@ export default function FcsTeamPage() {
           </div>
 
           <div style={{ marginTop: 10 }}>
-            <strong>Bottom Line:</strong> {tgemCoach.bottomLine}
+            <strong>Profile Summary:</strong> {tgemCoach.bottomLine}
           </div>
         </div>
       </section>
