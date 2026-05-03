@@ -216,6 +216,209 @@ function buildTeamBadgeText(teamName: string, abbreviation?: string | null) {
   return "N/A";
 }
 
+function buildTeamOverviewText(args: {
+  teamName: string;
+  mascot?: string | null;
+  conference: string;
+  classification: string;
+  subdivision: string;
+  venue?: string | null;
+  city?: string | null;
+  state?: string | null;
+  stats: SeasonStats | null;
+}) {
+  const {
+    teamName,
+    mascot,
+    conference,
+    classification,
+    subdivision,
+    venue,
+    city,
+    state,
+    stats,
+  } = args;
+  const nickname = mascot && mascot !== teamName ? mascot : teamName;
+  const locationParts = [city, state].filter(Boolean).join(", ");
+  const seed = Array.from(teamName).reduce(
+    (total, char, index) => (total * 31 + char.charCodeAt(0) * (index + 1)) >>> 0,
+    0,
+  );
+  const variant = seed % 12;
+  const locationText = venue
+    ? `${venue}${locationParts ? ` in ${locationParts}` : ""}`
+    : locationParts || "its home environment";
+  const venueLines = [
+    `${locationText} gives ${teamName} a familiar stage for the physical side of its season.`,
+    `The home base is ${locationText}, a useful piece of context when looking at travel, routine, and game-day edge.`,
+    `${teamName}'s home context runs through ${locationText}, tying the program to a specific football setting.`,
+    `When the schedule turns home, ${locationText} is the place attached to the team's week-to-week rhythm.`,
+    `${locationText} anchors the program geographically and gives the season page a clear football backdrop.`,
+    `The venue note matters here: ${locationText} is where the roster's style meets its home crowd and routine.`,
+  ];
+  const offenseLines =
+    stats?.pointsPerGame != null
+      ? stats.pointsPerGame >= 34
+        ? [
+            `${teamName}'s offense brings an explosive gear, especially when pace and early-down execution line up.`,
+            `With the ball, the ${nickname} can push tempo and make defenses defend width, space, and finishing power.`,
+            `The offensive personality is aggressive; ${teamName} is at its best when drives stay fast and decisive.`,
+          ]
+        : stats.pointsPerGame >= 24
+          ? [
+              `${teamName}'s offense has a practical feel, less frantic than flashy and more dependent on timing and clean series.`,
+              `${teamName} can vary pace on offense, using field position and timely calls instead of relying only on explosive gains.`,
+              `On offense, the ${nickname} look most comfortable when patience and timely shots work together.`,
+            ]
+          : [
+              `${teamName}'s offense is more methodical, so first downs, field position, and avoiding wasted snaps carry extra weight.`,
+              `${teamName} leans conservative with the ball, so possession quality matters more than raw pace.`,
+              `For the ${nickname}, offensive progress often has to come through patience and cleaner early downs.`,
+            ]
+      : [
+          `${teamName}'s offensive identity is still best judged through tempo, spacing, and how cleanly possessions are managed.`,
+          `The offense is easier to understand by watching approach: pace, personnel, and how often drives stay organized.`,
+          `With incomplete scoring context, the offensive read is about rhythm, play calling, and drive-to-drive consistency.`,
+        ];
+  const defenseLines =
+    stats?.pointsAllowedPerGame != null
+      ? stats.pointsAllowedPerGame <= 20
+        ? [
+            `${teamName}'s defense can set the tone when it creates difficult down-and-distance situations and wins contact.`,
+            `The defensive side has a physical edge, especially when it can dictate down-and-distance and squeeze space.`,
+            `${teamName}'s defensive identity gives the ${nickname} a firmer base than the scoreboard alone can explain.`,
+          ]
+        : stats.pointsAllowedPerGame <= 28
+          ? [
+              `${teamName} needs steadiness without the ball: tackling, leverage, and fewer series that swing the game.`,
+              `${teamName}'s defense works best in a disciplined lane, where structure can matter as much as splash plays.`,
+              `Without the ball, ${teamName} needs consistent fits and cleaner late-down answers to keep games under control.`,
+            ]
+          : [
+              `The defensive side has been more uneven, which puts a premium on stops after sudden changes and long possessions.`,
+              `${teamName}'s defensive concern is consistency; the ${nickname} need fewer unsettled stretches when the game speeds up.`,
+              `${teamName} has to protect its defense with possession control and better answers when opponents find rhythm.`,
+            ]
+      : [
+          `${teamName}'s defense is best evaluated through physicality, leverage, and whether the group can repeat stops over four quarters.`,
+          `On defense, the important clues are discipline, tackling, and how often the unit gets off the field cleanly.`,
+          `The defensive read comes down to strength, communication, and the ability to handle pressure without giving away momentum.`,
+        ];
+  const identityLines = [
+    `${teamName}'s identity begins in the ${conference}, where the ${nickname} operate on a ${classification} stage inside the ${subdivision.toLowerCase()} picture.`,
+    `The ${nickname} bring ${teamName} into the ${conference} race with a ${classification} label and a schedule that tests depth.`,
+    `${teamName} carries ${conference} expectations into a ${classification} season, so identity starts with league pressure and weekly execution.`,
+    `For ${teamName}, the starting point is simple: ${conference} football, ${classification} competition, and a roster trying to define its edge.`,
+    `The ${nickname} are framed by ${conference} play and ${classification} standards, but the useful read comes from how the team handles each week.`,
+    `${teamName}'s team page starts with a ${conference} identity, then lets the football details explain what kind of group the ${nickname} are becoming.`,
+  ];
+  const overallLines =
+    stats?.yardsPerGame != null && stats?.yardsAllowedPerGame != null
+      ? stats.yardsPerGame > stats.yardsAllowedPerGame
+        ? [
+            `${teamName} looks most complete when controlled offense and firm defensive play show up in the same game.`,
+            `The larger theme is command: move the ball, avoid wasted possessions, and keep the opponent from finding easy answers.`,
+            `${teamName}'s cleaner stretches come from assignment soundness and steady execution.`,
+          ]
+        : [
+            `${teamName}'s bigger challenge is tightening the space between offensive rhythm and defensive reliability.`,
+            `The team feels more volatile when one side of the ball has to cover for the other too often.`,
+            `Consistency is the word to watch as the season sample grows.`,
+          ]
+      : [
+          `${teamName}'s larger identity is still taking shape through leaders, play style, and week-to-week execution.`,
+          `The useful read is less about one number and more about how the team plays: pace, physicality, and discipline.`,
+          `${teamName} is best understood by pairing program context with the way the roster performs across the schedule.`,
+        ];
+  const styleOpeners =
+    stats?.yardsPerGame != null && stats?.yardsAllowedPerGame != null
+      ? stats.yardsPerGame > stats.yardsAllowedPerGame
+        ? [
+            `${teamName} can look like a control team when efficient offense and firm defensive play show up together.`,
+            `Control is the word around ${teamName} when the ${nickname} pair steady movement with enough defensive answers.`,
+            `${teamName}'s best football has a composed feel: move the ball, avoid waste, and keep the opponent off schedule.`,
+          ]
+        : [
+            `${teamName} is still working toward a cleaner four-quarter identity between offense, defense, and field position.`,
+            `The ${nickname} can become uneven when one side of the ball has to cover too much ground for the other.`,
+            `${teamName}'s team identity is about finding steadier control before games start to tilt away.`,
+          ]
+      : [
+          `${teamName}'s football identity is still being written through leaders, style, and weekly execution.`,
+          `The ${nickname} are easiest to read through tempo, physicality, and how the roster responds from week to week.`,
+          `${teamName} is best read by pairing program context with how the roster actually plays on Saturdays.`,
+        ];
+  const categoryPools = {
+    identity: identityLines,
+    venue: venueLines,
+    offense: offenseLines,
+    defense: defenseLines,
+    overall: overallLines,
+    style: styleOpeners,
+    schedule: [
+      `Each ${teamName} game listed below opens a fuller matchup breakdown when one is available.`,
+      `The schedule turns this ${nickname} overview into opponent-specific game pages as each matchup is available.`,
+      `Use the schedule to move from ${teamName}'s overview into the individual matchup reads.`,
+      `Every available game link below carries ${teamName} into a deeper opponent-by-opponent breakdown.`,
+      `The schedule section is where this ${teamName} context branches into specific matchup pages.`,
+      `From here, the listed games let you open the matchup view tied to each ${nickname} opponent.`,
+      `The game list below turns ${teamName}'s profile into matchup-by-matchup context.`,
+      `Each available opponent link gives the ${nickname} a more specific game lens.`,
+      `The schedule is the bridge from this ${teamName} overview to the individual game pages.`,
+      `Open a listed game to see how this ${teamName} context changes against that opponent.`,
+      `The opponent rows below carry the ${nickname} from team-level context into matchup detail.`,
+      `When a matchup page is available, the schedule links ${teamName}'s team view to that game.`,
+    ],
+  };
+  const categories = ["identity", "venue", "offense", "defense", "overall", "style"] as Array<
+    keyof typeof categoryPools
+  >;
+  const shape = seededCategoryOrder(categories, seed);
+  rotateCategoryOrder(shape, (teamName.length + seed) % shape.length);
+  const scheduleIndex = 2 + (seed % (shape.length - 1));
+  shape.splice(scheduleIndex, 0, "schedule");
+  const sentences = shape.map((category, index) => {
+    const pool = categoryPools[category];
+    return pool[(seed + index * 11 + variant) % pool.length];
+  });
+
+  return removeDuplicateSentences(sentences.join(" "));
+}
+
+function seededCategoryOrder<T>(items: T[], seed: number) {
+  const output = [...items];
+  let state = seed || 1;
+
+  for (let index = output.length - 1; index > 0; index -= 1) {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    const swapIndex = state % (index + 1);
+    [output[index], output[swapIndex]] = [output[swapIndex], output[index]];
+  }
+
+  return output;
+}
+
+function rotateCategoryOrder<T>(items: T[], offset: number) {
+  if (items.length === 0) return;
+  const normalized = offset % items.length;
+  if (normalized === 0) return;
+  items.push(...items.splice(0, normalized));
+}
+
+function removeDuplicateSentences(text: string) {
+  const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [text];
+  const seen = new Set<string>();
+  return sentences
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => {
+      const key = sentence.toLowerCase().replace(/\s+/g, " ");
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .join(" ");
+}
+
 function ColorSwatch({
   value,
   label,
@@ -811,6 +1014,17 @@ export default function FbsTeamPage() {
   );
 
   const teamBadgeText = buildTeamBadgeText(teamName, mergedMeta?.abbreviation);
+  const teamOverviewText = buildTeamOverviewText({
+    teamName,
+    mascot: mergedMeta?.mascot,
+    conference,
+    classification: formatClassificationLabel(mergedMeta?.classification, "FBS"),
+    subdivision,
+    venue: location?.name,
+    city: location?.city,
+    state: location?.state,
+    stats: seasonStats,
+  });
   const badgeBg = normalizeHexColor(colorProfile.primary) ?? "#f4f4f4";
   const badgeTextColor =
     normalizeHexColor(colorProfile.secondary) ?? contrastTextColor(badgeBg);
@@ -898,6 +1112,43 @@ export default function FbsTeamPage() {
               <ColorSwatch value={colorProfile.primary} label="Primary" />
               <ColorSwatch value={colorProfile.secondary} label="Secondary" />
             </div>
+            <div className="mt-5 border-t border-[var(--tgem-border)] pt-4">
+              <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                Team Overview
+              </div>
+              <p className="mt-3 text-sm leading-7 text-gray-700 dark:text-gray-300">
+                {teamOverviewText}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="tgem-surface-subtle mt-4 rounded-3xl p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-3xl">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+              New to TGEM team grades?
+            </h2>
+            <p className="mt-2 text-sm leading-7 text-gray-700 dark:text-gray-300">
+              This page shows how TGEM translates performance, consistency, and matchup context
+              into a structured team read. If you want the full model philosophy first, open the
+              guide before digging deeper into the numbers below.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/how-tgem-works"
+              className="rounded-lg bg-gray-900 px-5 py-3 text-sm font-semibold text-white hover:bg-gray-800 dark:bg-white dark:text-gray-950 dark:hover:bg-gray-200"
+            >
+              How TGEM Works
+            </Link>
+            <Link
+              href="/model-breakdown"
+              className="rounded-lg border border-[var(--tgem-border)] px-5 py-3 text-sm font-semibold text-gray-900 hover:bg-[var(--tgem-surface)] dark:text-gray-100"
+            >
+              Model Breakdown
+            </Link>
           </div>
         </div>
       </section>
