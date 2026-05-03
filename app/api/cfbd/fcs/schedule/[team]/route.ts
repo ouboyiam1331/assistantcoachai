@@ -56,6 +56,7 @@ export async function GET(
     const cfbdErrors: { year: number; status: number; detail: string }[] = [];
     let resolvedYear: number | null = null;
     let finalUrl: string | null = null;
+    let bestPartial: { games: unknown[]; year: number; url: string } | null = null;
 
     for (const y of yearsToTry) {
       const seasonType = "both";
@@ -70,11 +71,15 @@ export async function GET(
           },
         );
         const arr = Array.isArray(data) ? data : [];
-        finalUrl = `/games?year=${y}&team=${encodeURIComponent(teamFound.school)}&classification=fcs&seasonType=${seasonType}`;
-        if (arr.length > 0) {
+        const attemptUrl = `/games?year=${y}&team=${encodeURIComponent(teamFound.school)}&classification=fcs&seasonType=${seasonType}`;
+        finalUrl = attemptUrl;
+        if (arr.length >= 8 || y < yearNum) {
           games = arr;
           resolvedYear = y;
           break;
+        }
+        if (arr.length > 0 && (!bestPartial || arr.length > bestPartial.games.length)) {
+          bestPartial = { games: arr, year: y, url: attemptUrl };
         }
       } catch (err: unknown) {
         if (err instanceof CfbdHttpError) {
@@ -84,6 +89,12 @@ export async function GET(
         }
         continue;
       }
+    }
+
+    if (games.length === 0 && bestPartial) {
+      games = bestPartial.games;
+      resolvedYear = bestPartial.year;
+      finalUrl = bestPartial.url;
     }
 
     return NextResponse.json({

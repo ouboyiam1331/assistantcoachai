@@ -4,8 +4,6 @@ import Link from "next/link";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import AdSlot from "@/components/ui/AdSlot";
-import TgemDisclaimer from "@/components/ui/TgemDisclaimer";
-import { applyCollegeMatchupGuardrails } from "@/lib/college/matchupGuardrails";
 
 type TGEMResult = {
   ok: boolean;
@@ -115,22 +113,6 @@ function normalizeCfbdGame(raw: Record<string, unknown>): ScheduleGame {
   };
 }
 
-function deriveTgemPhase(game: ScheduleGame | null): TgemPhase {
-  const st = String(game?.seasonType ?? "").toLowerCase();
-  if (
-    st.includes("playoff") ||
-    st.includes("cfp") ||
-    st.includes("quarterfinal") ||
-    st.includes("semifinal") ||
-    st.includes("national championship")
-  ) {
-    return "cfp";
-  }
-  if (st.includes("post") || st.includes("bowl")) return "bowl";
-  if (typeof game?.week === "number" && game.week >= 14) return "championship";
-  return "regular";
-}
-
 function parsePhaseOverride(raw: string | null): TgemPhase | null {
   if (!raw) return null;
   const v = raw.toLowerCase();
@@ -205,102 +187,140 @@ function TeamProfileCard({
   );
 }
 
-type SnapshotLine = {
-  pointsPerGame?: number | null;
-  pointsAllowedPerGame?: number | null;
-  thirdDownPct?: number | null;
-  turnoverMarginPerGame?: number | null;
-  penaltyYardsPerGame?: number | null;
-};
+type TeamStats = NonNullable<NonNullable<TGEMResult["statsSnapshot"]>["team"]>;
 
-function buildCoachMatchupRead(args: {
-  favored: string;
-  opponent: string;
-  confidence?: number;
-  phase: TgemPhase;
-  favoredStats: SnapshotLine | null;
-  opponentStats: SnapshotLine | null;
-  fallbackReasons: string[];
+function statNumber(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function compareStat(
+  teamStats: TeamStats | null | undefined,
+  opponentStats: TeamStats | null | undefined,
+  key: keyof TeamStats,
+  higherIsBetter = true,
+) {
+  const team = statNumber(teamStats?.[key]);
+  const opponent = statNumber(opponentStats?.[key]);
+  if (team == null || opponent == null) return null;
+  const diff = team - opponent;
+  if (Math.abs(diff) < 0.1) return "even";
+  const teamBetter = higherIsBetter ? diff > 0 : diff < 0;
+  return teamBetter ? "team" : "opponent";
+}
+
+function contentSeed(value: string) {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+function rotateFromSeed<T>(items: T[], seed: number) {
+  if (!items.length) return items;
+  const start = seed % items.length;
+  return [...items.slice(start), ...items.slice(0, start)];
+}
+
+function buildContextTags(game: ScheduleGame, teamStats?: TeamStats | null, opponentStats?: TeamStats | null) {
+  const tags = new Set<string>();
+  const gameName = `${game.homeTeam ?? ""} ${game.awayTeam ?? ""}`.toLowerCase();
+  if (gameName.includes("rival") || gameName.includes("classic")) tags.add("Rivalry");
+  const seasonType = String(game.seasonType ?? "").toLowerCase();
+  if (seasonType.includes("post") || seasonType.includes("championship") || (game.week ?? 0) >= 11) {
+    tags.add("High Stakes");
+  }
+  const ppgA = statNumber(teamStats?.pointsPerGame);
+  const ppgB = statNumber(opponentStats?.pointsPerGame);
+  if (ppgA != null && ppgB != null && Math.abs(ppgA - ppgB) <= 4) tags.add("Even Matchup");
+  const turnoverA = statNumber(teamStats?.turnoverMarginPerGame);
+  const turnoverB = statNumber(opponentStats?.turnoverMarginPerGame);
+  if (game.neutralSite || (turnoverA != null && turnoverB != null && Math.abs(turnoverA - turnoverB) >= 0.6)) {
+    tags.add("Volatile Game");
+  }
+  return Array.from(tags).slice(0, 4);
+}
+
+function buildMatchupContent(args: {
+  teamName: string;
+  opponentName: string;
+  game: ScheduleGame;
+  teamStats?: TeamStats | null;
+  opponentStats?: TeamStats | null;
 }) {
-  const {
-    favored,
-    opponent,
-    confidence,
-    phase,
-    favoredStats,
-    opponentStats,
-    fallbackReasons,
-  } = args;
-
-  const bullets: string[] = [];
-  const risks: string[] = [];
-
-  const ppgEdge =
-    favoredStats?.pointsPerGame != null && opponentStats?.pointsPerGame != null
-      ? favoredStats.pointsPerGame - opponentStats.pointsPerGame
-      : null;
-  if (ppgEdge != null) {
-    if (ppgEdge >= 2) bullets.push("their offense has been creating steadier scoring drives");
-    else if (ppgEdge <= -2) risks.push("the offense can get squeezed if early drives stall");
-  }
-
-  const defEdge =
-    favoredStats?.pointsAllowedPerGame != null &&
-    opponentStats?.pointsAllowedPerGame != null
-      ? opponentStats.pointsAllowedPerGame - favoredStats.pointsAllowedPerGame
-      : null;
-  if (defEdge != null) {
-    if (defEdge >= 2) bullets.push("the defense has been more reliable at limiting scoring");
-    else if (defEdge <= -2) risks.push("defensive leaks can flip momentum fast");
-  }
-
-  const thirdEdge =
-    favoredStats?.thirdDownPct != null && opponentStats?.thirdDownPct != null
-      ? favoredStats.thirdDownPct - opponentStats.thirdDownPct
-      : null;
-  if (thirdEdge != null) {
-    if (thirdEdge >= 3) bullets.push("they are extending drives better on third down");
-    else if (thirdEdge <= -3) risks.push("third-down efficiency is a pressure point");
-  }
-
-  const toEdge =
-    favoredStats?.turnoverMarginPerGame != null &&
-    opponentStats?.turnoverMarginPerGame != null
-      ? favoredStats.turnoverMarginPerGame - opponentStats.turnoverMarginPerGame
-      : null;
-  if (toEdge != null) {
-    if (toEdge >= 0.2) bullets.push("they have the cleaner turnover profile");
-    else if (toEdge <= -0.2) risks.push("turnovers are the clearest upset path");
-  }
-
-  const disciplineEdge =
-    favoredStats?.penaltyYardsPerGame != null &&
-    opponentStats?.penaltyYardsPerGame != null
-      ? opponentStats.penaltyYardsPerGame - favoredStats.penaltyYardsPerGame
-      : null;
-  if (disciplineEdge != null) {
-    if (disciplineEdge >= 5) bullets.push("discipline has been better in hidden-yardage spots");
-    else if (disciplineEdge <= -5) risks.push("penalty volume can stall otherwise good possessions");
-  }
-
-  const confidenceText =
-    typeof confidence === "number" ? ` at ${confidence}/100 confidence` : "";
-  const line1 = `From a sideline view, TGEM leans ${favored}${confidenceText} in this ${phase.toUpperCase()} spot.`;
-
-  if (bullets.length === 0) {
-    const fallback = fallbackReasons.slice(0, 2).join("; ");
-    const line2 = fallback
-      ? `The edge is model-driven right now: ${fallback}.`
-      : `The edge is coming from composite ratings and situational execution signals.`;
-    return `${line1} ${line2}`;
-  }
-
-  const line2 = `${favored} has the cleaner path because ${bullets.slice(0, 2).join(" and ")}.`;
-  const line3 =
-    risks.length > 0
-      ? `Flip risk: ${risks[0]}. If ${opponent} wins that area, this game can turn fast.`
-      : `If they stay clean situationally, ${favored} is built to control this game wire to wire.`;
-  return `${line1} ${line2} ${line3}`;
+  const { teamName, opponentName, game, teamStats, opponentStats } = args;
+  const teamOffense = compareStat(teamStats, opponentStats, "pointsPerGame");
+  const opponentDefense = compareStat(opponentStats, teamStats, "pointsAllowedPerGame", false);
+  const thirdDown = compareStat(teamStats, opponentStats, "thirdDownPct");
+  const turnover = compareStat(teamStats, opponentStats, "turnoverMarginPerGame");
+  const penalties = compareStat(teamStats, opponentStats, "penaltyYardsPerGame", false);
+  const seed = contentSeed(`${teamName}|${opponentName}|${game.id ?? ""}|${game.week ?? ""}|${game.venue ?? ""}`);
+  const angle = seed % 8;
+  const offenseTeam = teamOffense === "team" ? teamName : teamOffense === "opponent" ? opponentName : null;
+  const defenseTeam = opponentDefense === "opponent" ? teamName : opponentDefense === "team" ? opponentName : null;
+  const thirdDownTeam = thirdDown === "team" ? teamName : thirdDown === "opponent" ? opponentName : null;
+  const turnoverTeam = turnover === "team" ? teamName : turnover === "opponent" ? opponentName : null;
+  const cleanerTeam = penalties === "team" ? teamName : penalties === "opponent" ? opponentName : null;
+  const venueText = game.neutralSite ? "on a neutral field" : game.venue ? `at ${game.venue}` : "with the venue still listed as TBD";
+  const redZoneTeam = (seed & 1) === 0 ? offenseTeam : defenseTeam;
+  const pressureTeam = defenseTeam ?? (seed % 2 === 0 ? teamName : opponentName);
+  const consistencyTeam = cleanerTeam ?? turnoverTeam ?? (seed % 2 === 0 ? teamName : opponentName);
+  const overviewOptions = [
+    `Red-zone snaps are a good place to begin for ${teamName} and ${opponentName} ${venueText}. ${redZoneTeam ? `${redZoneTeam} has the profile clue that can matter when space gets tight.` : `The numbers do not give either side an easy finishing label.`} In FCS games with narrow margins, one stalled drive inside scoring range can change how both staffs handle the next series.`,
+    `The defensive front is the first real question. ${pressureTeam} is tied to the disruption angle, whether that comes from interior push, edge contain, or forcing throws before the route develops. The opposing offense has to keep the game out of recovery mode.`,
+    `Explosive-play prevention gives this game a different lens ${venueText}. ${offenseTeam ? `${offenseTeam} has more scoring lift in the profile, so missed tackles and poor pursuit angles are dangerous.` : `With scoring production close, a single chunk play can become the separator.`} The rest of the matchup is about limiting those sudden stress points.`,
+    `Consistency is the story if this game settles into routine possessions. ${consistencyTeam} owns the cleaner operational hint, but that only matters if it carries through penalties, substitutions, and late-down choices. ${teamName} and ${opponentName} both need repeatable answers rather than one good series.`,
+    `The setting comes with its own demands ${venueText}. ${game.week != null && game.week >= 11 ? `Late-season FCS football can expose depth and special teams operation quickly.` : `Earlier schedule spots can still reveal which roster is settling into its weekly identity.`} Communication, tackling, and sideline adjustment matter as much as the top-line production.`,
+    `Quarterback timing is the hinge point. If protection holds, the offense can stay layered; if ${pressureTeam} compresses the pocket, throws become shorter, reads speed up, and second down gets harder. That pressure story is worth watching from the first series.`,
+    `Special teams can carry a larger share of this game than the matchup card suggests. Coverage lanes, return decisions, and punt location can decide how much grass each offense has to cover. That is especially important if both defenses make early stops.`,
+    `Short-yardage football gives this page its cleanest physical lens. ${defenseTeam ? `${defenseTeam} has the better defensive signal, but the test is repeated contact, not one isolated stop.` : `The defensive split is not strong enough to settle the read alone.`} Watch how each side handles third-and-short, goal-line spacing, and tackles after contact.`,
+  ];
+  const flowOptions = [
+    `A red-zone-heavy script would make tight formations, fourth-down judgment, and goal-line tackling more important than yardage totals.`,
+    `If pressure wins early, expect quicker throws, moving pockets, and more calls designed to slow the rush.`,
+    `A special teams field-position game can make both offenses feel more conservative than their season profiles suggest.`,
+    `Explosive plays would open the game up; if they disappear, patience and drive finishing become the operating terms.`,
+    `If ${thirdDownTeam ?? "one side"} keeps converting late downs, the other defense may have to simplify personnel calls.`,
+    `A sudden turnover can change the play-calling temperature, especially if ${turnoverTeam ?? "the recovering team"} has to defend a short field.`,
+    `Penalty trouble can make the game choppy and force drives to survive behind-schedule snaps.`,
+    `Fatigue matters if one front keeps absorbing downhill runs without clean substitution chances.`,
+  ];
+  const factorPool = [
+    redZoneTeam ? `${redZoneTeam}'s red-zone patience` : "Who finishes drives after crossing midfield",
+    `${pressureTeam}'s ability to hurry the quarterback`,
+    offenseTeam ? `${offenseTeam}'s explosive-play creation` : "The first offense to create space after the catch",
+    defenseTeam ? `${defenseTeam}'s tackling through contact` : "Defensive fits against second-effort yards",
+    thirdDownTeam ? `${thirdDownTeam}'s late-down conversion work` : "Early-down success before third down arrives",
+    turnoverTeam ? `${turnoverTeam}'s short-field prevention` : "Ball security after momentum shifts",
+    cleanerTeam ? `${cleanerTeam}'s discipline on drive-extending downs` : "Penalty timing around midfield",
+    game.neutralSite ? "Neutral-site cadence and communication" : "Home-site operation and substitution rhythm",
+  ];
+  const keyFactors = rotateFromSeed(factorPool, seed + angle).slice(0, 4);
+  const swingPool = [
+    "A busted coverage can create a touchdown chance before the defense resets.",
+    "A red-zone false start can turn a scoring chance into a field-goal decision.",
+    "Interior pressure can force hurried throws before routes uncover.",
+    "Missed tackles after contact can turn modest gains into explosive plays.",
+    "A punt coverage mistake can hand the offense a short field.",
+    "A worn-down defensive front can change the fourth-quarter run menu.",
+    "A quarterback scramble on third down can extend more than just the drive.",
+    "A mishandled exchange can become the sudden-change play both teams remember.",
+  ];
+  const swingFactors = rotateFromSeed(swingPool, seed + 7).slice(0, 3);
+  const summaryOptions = [
+    `Drive finishing may say more than yardage if both teams reach scoring range.`,
+    `Pocket stress, tackling, and special teams detail give this game its most useful shape.`,
+    `Explosive-play control is the difference between a measured game and a sudden one.`,
+    `The steadier sideline across ordinary snaps should have the better handle on game state.`,
+    `Short fields and red-zone defense are worth tracking as closely as offensive output.`,
+    `This is a detail read: pressure, leverage, communication, and drive-ending execution.`,
+    `Consistency on routine downs may matter more than one standout possession.`,
+    `The game story is a set of pressure points, not one category carrying the whole read.`,
+  ];
+  const overview = overviewOptions[angle];
+  const flow = flowOptions[(seed >>> 3) % flowOptions.length];
+  const summary = summaryOptions[(seed >>> 5) % summaryOptions.length];
+  return { overview, flow, keyFactors, swingFactors, summary };
 }
 
 export default function FcsMatchupPage() {
@@ -347,8 +367,7 @@ export default function FcsMatchupPage() {
     if (awayNorm.includes(teamNorm) || teamNorm.includes(awayNorm)) return game.homeTeam ?? "";
     return game.homeTeam ?? "";
   }, [opponentFromQuery, game?.homeTeam, game?.awayTeam, teamName]);
-  const autoPhase = useMemo(() => deriveTgemPhase(game), [game]);
-  const effectivePhase = phaseOverride === "auto" ? autoPhase : phaseOverride;
+
   useEffect(() => {
     const currentQs = search.toString();
     const params = new URLSearchParams(currentQs);
@@ -405,14 +424,14 @@ export default function FcsMatchupPage() {
     return `${game.awayTeam} @ ${game.homeTeam}`;
   }, [game]);
   const seoHeading = useMemo(() => {
-    if (!game?.homeTeam || !game?.awayTeam) return "College Football Prediction & Analysis";
-    return `${game.homeTeam} vs ${game.awayTeam} Prediction & Analysis`;
+    if (!game?.homeTeam || !game?.awayTeam) return "College Football Matchup Analysis";
+    return `${game.homeTeam} vs ${game.awayTeam} Matchup Analysis`;
   }, [game]);
   const seoDescription = useMemo(() => {
     if (!game?.homeTeam || !game?.awayTeam) {
-      return "TGEM matchup breakdown with key stats, matchup advantages, and model-based prediction.";
+      return "An in-depth breakdown of team strengths, styles, and matchup dynamics.";
     }
-    return `TGEM breakdown of ${game.homeTeam} vs ${game.awayTeam}, including key stats, matchup advantages, and model-based prediction.`;
+    return `An in-depth breakdown of ${game.homeTeam} vs ${game.awayTeam}, covering team strengths, styles, and matchup dynamics.`;
   }, [game]);
 
   const status = useMemo(() => {
@@ -436,11 +455,7 @@ export default function FcsMatchupPage() {
     const homeStats = teamIsHome ? teamStats : teamIsAway ? opponentStats : teamStats;
     const awayStats = teamIsAway ? teamStats : teamIsHome ? opponentStats : opponentStats;
 
-    const homeRating = teamIsHome || !teamIsAway ? (tgem.ratings?.team ?? null) : (tgem.ratings?.opponent ?? null);
-    const awayRating = teamIsAway || !teamIsHome ? (tgem.ratings?.team ?? null) : (tgem.ratings?.opponent ?? null);
-
     return [
-      { reason: "TGEM Rating", away: awayRating == null ? "N/A" : String(awayRating), home: homeRating == null ? "N/A" : String(homeRating) },
       { reason: "Points / Game", away: fmtStat(awayStats.pointsPerGame), home: fmtStat(homeStats.pointsPerGame) },
       { reason: "Points Allowed / Game", away: fmtStat(awayStats.pointsAllowedPerGame), home: fmtStat(homeStats.pointsAllowedPerGame) },
       { reason: "Yards / Game", away: fmtStat(awayStats.yardsPerGame), home: fmtStat(homeStats.yardsPerGame) },
@@ -454,73 +469,21 @@ export default function FcsMatchupPage() {
 
   const requestedTeamName = useMemo(() => teamName || teamSlug, [teamName, teamSlug]);
   const requestedOpponentName = useMemo(() => opponentName || "Opponent", [opponentName]);
-  const guardedSummary = useMemo(
-    () =>
-      applyCollegeMatchupGuardrails({
-        homeTeam: game?.homeTeam,
-        awayTeam: game?.awayTeam,
-        neutralSite: game?.neutralSite,
-        lean: tgem?.lean,
-        confidence: tgem?.confidence,
-        reasons: tgem?.reasons,
-      }),
-    [game?.awayTeam, game?.homeTeam, game?.neutralSite, tgem?.confidence, tgem?.lean, tgem?.reasons],
-  );
-
-  const coachRead = useMemo(() => {
-    if (!tgem) return null;
-    const teamDisplay = teamName || "Team";
-    const oppDisplay = opponentName || "Opponent";
-
-    const teamNorm = normalizeTeamName(teamName);
-    const homeNorm = normalizeTeamName(game?.homeTeam ?? "");
-    const awayNorm = normalizeTeamName(game?.awayTeam ?? "");
-    const teamIsHome = Boolean(homeNorm) && (homeNorm.includes(teamNorm) || teamNorm.includes(homeNorm));
-    const teamIsAway = Boolean(awayNorm) && (awayNorm.includes(teamNorm) || teamNorm.includes(awayNorm));
-
-    const favoredByLean =
-      guardedSummary.lean === "HOME"
-        ? teamIsHome
-          ? teamDisplay
-          : game?.homeTeam ?? teamDisplay
-        : guardedSummary.lean === "AWAY"
-          ? teamIsAway
-            ? teamDisplay
-            : game?.awayTeam ?? oppDisplay
-          : (tgem.ratings?.delta ?? 0) >= 0
-            ? teamDisplay
-            : oppDisplay;
-
-    const underdog = favoredByLean === teamDisplay ? oppDisplay : teamDisplay;
-    const favoredStats =
-      favoredByLean === teamDisplay
-        ? tgem.statsSnapshot?.team ?? null
-        : tgem.statsSnapshot?.opponent ?? null;
-    const opponentStats =
-      favoredByLean === teamDisplay
-        ? tgem.statsSnapshot?.opponent ?? null
-        : tgem.statsSnapshot?.team ?? null;
-
-    return buildCoachMatchupRead({
-      favored: favoredByLean,
-      opponent: underdog,
-      confidence: guardedSummary.confidence ?? undefined,
-      phase: effectivePhase,
-      favoredStats,
-      opponentStats,
-      fallbackReasons: guardedSummary.reasons,
+  const matchupContent = useMemo(() => {
+    if (!game || !tgem) return null;
+    return buildMatchupContent({
+      teamName: requestedTeamName,
+      opponentName: requestedOpponentName,
+      game,
+      teamStats: tgem.statsSnapshot?.team,
+      opponentStats: tgem.statsSnapshot?.opponent,
     });
-  }, [
-    guardedSummary.confidence,
-    guardedSummary.lean,
-    guardedSummary.reasons,
-    tgem,
-    teamName,
-    opponentName,
-    game?.homeTeam,
-    game?.awayTeam,
-    effectivePhase,
-  ]);
+  }, [game, requestedOpponentName, requestedTeamName, tgem]);
+
+  const contextTags = useMemo(() => {
+    if (!game) return [];
+    return buildContextTags(game, tgem?.statsSnapshot?.team, tgem?.statsSnapshot?.opponent);
+  }, [game, tgem?.statsSnapshot?.opponent, tgem?.statsSnapshot?.team]);
 
   return (
     <main className="tgem-page px-6 py-12">
@@ -551,16 +514,13 @@ export default function FcsMatchupPage() {
                 Season {seasonYear}
               </span>
               <span className="rounded-full border border-[var(--tgem-border)] px-3 py-1">
-                {effectivePhase.toUpperCase()} Phase
-              </span>
-              <span className="rounded-full border border-[var(--tgem-border)] px-3 py-1">
-                TGEM Matchup Read
+                Matchup Analysis
               </span>
             </div>
             <h2 className="mt-4 text-2xl font-semibold text-gray-900 dark:text-gray-100" style={{ marginBottom: 6 }}>{title}</h2>
             <p className="max-w-3xl text-sm leading-7 text-gray-700 dark:text-gray-300">
-              Compare the current college profile for {requestedTeamName} and {requestedOpponentName},
-              then read the live TGEM lean without changing any of the underlying matchup logic.
+              An in-depth breakdown of team strengths, styles, and matchup dynamics for{" "}
+              {requestedTeamName} and {requestedOpponentName}.
             </p>
             <div className="mt-4 grid gap-4 md:grid-cols-3">
               <SummaryTile label="Date" value={formatDateTime(game.startDate)} />
@@ -572,34 +532,24 @@ export default function FcsMatchupPage() {
             </div>
           </div>
 
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100" style={{ marginBottom: 10 }}>TGEM v11 Analysis</h2>
-          <TgemDisclaimer />
-          <div style={{ marginBottom: 10, display: "flex", gap: 10, alignItems: "center" }}>
-            <label htmlFor="phaseOverride" style={{ fontWeight: 600 }}>
-              TGEM Phase:
-            </label>
-            <select
-              id="phaseOverride"
-              value={phaseOverride}
-              onChange={(e) => setPhaseOverride(e.target.value as "auto" | TgemPhase)}
-              style={{ border: "1px solid var(--tgem-border)", borderRadius: 6, padding: "4px 8px", background: "var(--tgem-surface)", color: "var(--foreground)" }}
-            >
-              <option value="auto">Auto ({autoPhase.toUpperCase()})</option>
-              <option value="regular">Regular</option>
-              <option value="championship">Championship</option>
-              <option value="bowl">Bowl</option>
-              <option value="cfp">CFP</option>
-            </select>
-            <span style={{ color: "var(--tgem-muted)", fontSize: 13 }}>
-              Effective: {effectivePhase.toUpperCase()}
-            </span>
-          </div>
           {tgemErr ? (
             <div style={{ color: "#b00020" }}>{tgemErr}</div>
           ) : !tgem ? (
-            <div style={{ color: "var(--tgem-muted)" }}>Running TGEM...</div>
+            <div style={{ color: "var(--tgem-muted)" }}>Loading matchup data...</div>
           ) : (
             <div className="space-y-6">
+              {contextTags.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {contextTags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full border border-[var(--tgem-border)] px-3 py-1 text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               <div className="space-y-6">
                 <section className="tgem-surface rounded-3xl p-6 text-gray-900 dark:text-gray-100">
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
@@ -619,11 +569,11 @@ export default function FcsMatchupPage() {
 
                 <section className="tgem-surface rounded-3xl p-6 text-gray-900 dark:text-gray-100">
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                    Weighted Category Scores
+                    Team Comparison
                   </h3>
                   <p className="mt-2 text-sm leading-7 text-gray-700 dark:text-gray-300">
-                    This keeps the existing college comparison logic, but presents it as a cleaner
-                    side-by-side scoring board.
+                    Raw team stats provide the baseline for comparing production, defensive resistance,
+                    possession traits, and discipline.
                   </p>
                   {reasonTable ? (
                     <div className="mt-4 overflow-x-auto text-sm text-gray-700 dark:text-gray-300">
@@ -653,74 +603,68 @@ export default function FcsMatchupPage() {
                       </table>
                     </div>
                   ) : (
-                    <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-gray-700 dark:text-gray-300">
-                      {(tgem.reasons ?? []).slice(0, 8).map((r, i) => (
-                        <li key={`${i}_${r}`}>{r}</li>
-                      ))}
-                    </ul>
+                    <p className="mt-4 text-sm text-gray-700 dark:text-gray-300">
+                      Team comparison data is still loading for this matchup.
+                    </p>
                   )}
                 </section>
               </div>
 
               <section className="tgem-surface rounded-3xl p-6 text-gray-900 dark:text-gray-100">
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                  TGEM Read
+                  Matchup Overview
                 </h3>
-                <p className="mt-2 text-sm leading-7 text-gray-700 dark:text-gray-300">
-                  The model output below is unchanged. This is the same lean, confidence, and reasons,
-                  just organized into a cleaner read.
-                </p>
-                <div className="mt-4 grid gap-4 md:grid-cols-3">
-                  <SummaryTile label="Lean" value={guardedSummary.lean ?? "UNDEFINED"} />
-                  <SummaryTile
-                    label="Confidence"
-                    value={
-                      typeof guardedSummary.confidence === "number"
-                        ? `${guardedSummary.confidence} / 100`
-                        : "N/A"
-                    }
-                  />
-                  <SummaryTile
-                    label="Rating Edge"
-                    value={
-                      typeof tgem.ratings?.delta === "number"
-                        ? String(tgem.ratings.delta)
-                        : "N/A"
-                    }
-                  />
-                </div>
-                <div className="mt-4 text-sm text-gray-700 dark:text-gray-300">
-                  {typeof tgem.ratings?.team === "number" && typeof tgem.ratings?.opponent === "number" ? (
-                    <>
-                      <strong className="text-gray-900 dark:text-gray-100">TGEM Ratings:</strong>{" "}
-                      {requestedTeamName}: {tgem.ratings.team} | {requestedOpponentName}: {tgem.ratings.opponent}
-                    </>
-                  ) : null}
-                </div>
-                {coachRead ? (
-                  <p className="mt-4 text-sm leading-7 text-gray-700 dark:text-gray-300">
-                    <strong className="text-gray-900 dark:text-gray-100">TGEM Coach Read:</strong>{" "}
-                    {coachRead}
+                {matchupContent ? (
+                  <div className="mt-2 space-y-6 text-sm leading-7 text-gray-700 dark:text-gray-300">
+                    <p>{matchupContent.overview}</p>
+                    <div>
+                      <h4 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                        Game Flow Outlook
+                      </h4>
+                      <p className="mt-2">{matchupContent.flow}</p>
+                    </div>
+                    <div>
+                      <h4 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                        Key Matchup Factors
+                      </h4>
+                      <ul className="mt-3 list-disc space-y-2 pl-5">
+                        {matchupContent.keyFactors.map((factor) => (
+                          <li key={factor}>{factor}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <h4 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                        Swing Factors
+                      </h4>
+                      <ul className="mt-3 list-disc space-y-2 pl-5">
+                        {matchupContent.swingFactors.map((factor) => (
+                          <li key={factor}>{factor}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <h4 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                        Game Summary
+                      </h4>
+                      <p className="mt-2">{matchupContent.summary}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm leading-7 text-gray-700 dark:text-gray-300">
+                    Matchup analysis will appear once team data is available.
                   </p>
-                ) : null}
-                <div className="mt-4">
-                  <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">Model Reasons</div>
-                  <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-gray-700 dark:text-gray-300">
-                    {guardedSummary.reasons.slice(0, 8).map((r, i) => (
-                      <li key={`${i}_${r}`}>{r}</li>
-                    ))}
-                  </ul>
-                </div>
+                )}
               </section>
             </div>
           )}
           <div className="tgem-cta-success" style={{ marginTop: 16, padding: 16 }}>
             <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
-              Want to carry this lean into Pick&apos;em?
+              Want to compare this game with the rest of your slate?
             </div>
             <p className="tgem-cta-success-copy" style={{ margin: "0 0 12px 0", lineHeight: 1.6 }}>
-              Jump into Pick&apos;em Mode to stack multiple TGEM matchup reads on one
-              slate and make your own calls from there. The lean is a guide, not a lock.
+              Open Pick&apos;em Mode to organize games, compare team context, and make your
+              own calls from the full board.
             </p>
             <Link
               href="/pickem"
@@ -733,7 +677,7 @@ export default function FcsMatchupPage() {
               }}
               className="tgem-cta-success-button"
             >
-              Build Picks Now
+              Open Pick&apos;em Mode
             </Link>
           </div>
           <div style={{ marginTop: 14 }}>
